@@ -295,6 +295,31 @@
     padding:0 10px;
   }
   #importFile{display:none;}
+  .sync-status{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:10px 4px;
+    font-size:12px;
+    color:var(--muted);
+  }
+  .sync-dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex-shrink:0;}
+  .sync-dot.ok{background:var(--green);}
+  .sync-dot.error{background:var(--red);}
+  .sync-dot.pending{background:#F2B134;}
+  .sync-row{display:flex;gap:10px;margin-top:8px;}
+  .sync-row button{
+    flex:1;
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:10px;
+    font-size:12px;
+    color:var(--navy);
+    font-weight:600;
+    cursor:pointer;
+  }
+  .sync-row button.link{border:none;color:var(--muted);font-weight:500;text-decoration:underline;background:none;}
   .toast{
     position:fixed;
     top:16px;
@@ -360,13 +385,28 @@
     </section>
 
     <section class="block settings-block">
+      <h2>Synchronisation</h2>
+      <div class="sync-status">
+        <span class="sync-dot" id="syncDot"></span>
+        <span id="syncText">Non configuree</span>
+      </div>
+      <div class="sync-row" id="syncActionsConfigured" style="display:none;">
+        <button id="btnSyncNow">Synchroniser</button>
+        <button class="link" id="btnSyncEdit">Modifier</button>
+      </div>
+      <div class="sync-row" id="syncActionsUnconfigured">
+        <button id="btnSyncSetup">Activer la synchronisation</button>
+      </div>
+    </section>
+
+    <section class="block settings-block">
       <h2>Mes donnees</h2>
       <div class="settings-row">
         <button id="btnExport">Exporter (sauvegarde)</button>
         <button id="btnImportTrigger">Importer</button>
       </div>
       <input type="file" id="importFile" accept="application/json">
-      <p class="note">Tes donnees restent uniquement dans ce navigateur, sur cet appareil. Rien n'est envoye a un serveur. Exporte regulierement pour garder une copie de secours.</p>
+      <p class="note">Tes donnees restent sur cet appareil. Si tu actives la synchronisation, elles sont aussi chiffrees puis envoyees vers ton propre repository GitHub prive, illisible sans ton mot de passe de chiffrement. Exporte regulierement pour garder une copie de secours.</p>
     </section>
   </main>
 
@@ -400,6 +440,37 @@
       <div class="sheet-actions">
         <button class="btn-cancel" id="btnCancel">Annuler</button>
         <button class="btn-save" id="btnSave">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="syncOverlay">
+    <div class="sheet">
+      <h3>Configurer la synchronisation</h3>
+      <div class="field">
+        <label for="sOwner">Nom d'utilisateur GitHub</label>
+        <input type="text" id="sOwner" placeholder="Ex: nicolasmathis" autocapitalize="off" autocorrect="off">
+      </div>
+      <div class="field">
+        <label for="sRepo">Nom du repository de donnees</label>
+        <input type="text" id="sRepo" placeholder="budget-plus-data" autocapitalize="off" autocorrect="off">
+      </div>
+      <div class="field">
+        <label for="sToken">Token d'acces GitHub</label>
+        <input type="password" id="sToken" placeholder="github_pat_..." autocapitalize="off" autocorrect="off">
+      </div>
+      <div class="field">
+        <label for="sPass">Mot de passe de chiffrement</label>
+        <input type="password" id="sPass" placeholder="Choisis un mot de passe" autocapitalize="off" autocorrect="off">
+      </div>
+      <div class="field">
+        <label for="sPass2">Confirme le mot de passe</label>
+        <input type="password" id="sPass2" placeholder="Retape le meme mot de passe" autocapitalize="off" autocorrect="off">
+      </div>
+      <p class="note" style="margin-top:0;">Si tu perds ce mot de passe, tes donnees synchronisees deviennent illisibles pour toujours. Note le dans un endroit sur. Sur un nouvel appareil, utilise exactement le meme mot de passe pour retrouver tes donnees.</p>
+      <div class="sheet-actions">
+        <button class="btn-cancel" id="syncCancel">Annuler</button>
+        <button class="btn-save" id="syncSave">Activer</button>
       </div>
     </div>
   </div>
@@ -572,6 +643,7 @@
           saveTransactions(transactions);
           renderAll();
           showToast("Transaction supprimee");
+          pushRemoteIfConfigured();
         }
       });
     });
@@ -695,6 +767,7 @@
     closeSheet();
     renderAll();
     showToast("Transaction enregistree");
+    pushRemoteIfConfigured();
   });
 
   document.getElementById("btnExport").addEventListener("click", function(){
@@ -736,6 +809,7 @@
         saveTransactions(transactions);
         renderAll();
         showToast("Import reussi");
+        pushRemoteIfConfigured();
       }catch(err){
         alert("Ce fichier ne peut pas etre lu. Verifie que c'est bien un export Budget Plus.");
       }
@@ -743,6 +817,277 @@
     };
     reader.readAsText(file);
   });
+
+  // ---------- Synchronisation chiffree via GitHub ----------
+
+  var SYNC_CONFIG_KEY = "budgetplus_sync_config_v1";
+  var SYNC_SHA_KEY = "budgetplus_sync_sha_v1";
+  var DATA_PATH = "data.json";
+
+  function loadSyncConfig(){
+    try{
+      var raw = localStorage.getItem(SYNC_CONFIG_KEY);
+      return raw ? JSON.parse(raw) : null;
+    }catch(e){ return null; }
+  }
+
+  function saveSyncConfig(cfg){
+    localStorage.setItem(SYNC_CONFIG_KEY, JSON.stringify(cfg));
+  }
+
+  function clearSyncConfig(){
+    localStorage.removeItem(SYNC_CONFIG_KEY);
+    localStorage.removeItem(SYNC_SHA_KEY);
+  }
+
+  function bufToB64(buf){
+    var bytes = new Uint8Array(buf);
+    var binary = "";
+    for(var i=0;i<bytes.length;i++){ binary += String.fromCharCode(bytes[i]); }
+    return btoa(binary);
+  }
+
+  function b64ToBuf(b64){
+    var binary = atob(b64);
+    var bytes = new Uint8Array(binary.length);
+    for(var i=0;i<binary.length;i++){ bytes[i] = binary.charCodeAt(i); }
+    return bytes.buffer;
+  }
+
+  function randomBytes(n){
+    return crypto.getRandomValues(new Uint8Array(n));
+  }
+
+  function deriveKey(passphrase, saltBytes){
+    var enc = new TextEncoder();
+    return crypto.subtle.importKey("raw", enc.encode(passphrase), { name:"PBKDF2" }, false, ["deriveKey"])
+      .then(function(keyMaterial){
+        return crypto.subtle.deriveKey(
+          { name:"PBKDF2", salt: saltBytes, iterations: 150000, hash:"SHA-256" },
+          keyMaterial,
+          { name:"AES-GCM", length:256 },
+          false,
+          ["encrypt","decrypt"]
+        );
+      });
+  }
+
+  function encryptData(obj, passphrase){
+    var salt = randomBytes(16);
+    var iv = randomBytes(12);
+    return deriveKey(passphrase, salt).then(function(key){
+      var enc = new TextEncoder();
+      var plaintext = enc.encode(JSON.stringify(obj));
+      return crypto.subtle.encrypt({ name:"AES-GCM", iv: iv }, key, plaintext).then(function(ciphertext){
+        return {
+          salt: bufToB64(salt),
+          iv: bufToB64(iv),
+          data: bufToB64(ciphertext)
+        };
+      });
+    });
+  }
+
+  function decryptData(payload, passphrase){
+    var salt = new Uint8Array(b64ToBuf(payload.salt));
+    var iv = new Uint8Array(b64ToBuf(payload.iv));
+    return deriveKey(passphrase, salt).then(function(key){
+      var ciphertext = b64ToBuf(payload.data);
+      return crypto.subtle.decrypt({ name:"AES-GCM", iv: iv }, key, ciphertext).then(function(plaintext){
+        var dec = new TextDecoder();
+        return JSON.parse(dec.decode(plaintext));
+      });
+    });
+  }
+
+  function githubGetFile(cfg){
+    var url = "https://api.github.com/repos/" + cfg.owner + "/" + cfg.repo + "/contents/" + DATA_PATH;
+    return fetch(url, {
+      headers: { "Authorization":"Bearer " + cfg.token, "Accept":"application/vnd.github+json" }
+    }).then(function(res){
+      if(res.status === 404) return null;
+      if(!res.ok) return res.text().then(function(t){ throw new Error("Lecture GitHub echouee (" + res.status + ")"); });
+      return res.json().then(function(json){
+        var content = atob(json.content.replace(/\n/g,""));
+        return { sha: json.sha, payload: JSON.parse(content) };
+      });
+    });
+  }
+
+  function githubPutFile(cfg, payloadObj, sha){
+    var url = "https://api.github.com/repos/" + cfg.owner + "/" + cfg.repo + "/contents/" + DATA_PATH;
+    var body = {
+      message: "Sync budget plus " + new Date().toISOString(),
+      content: btoa(JSON.stringify(payloadObj)),
+      branch: "main"
+    };
+    if(sha) body.sha = sha;
+    return fetch(url, {
+      method: "PUT",
+      headers: {
+        "Authorization":"Bearer " + cfg.token,
+        "Accept":"application/vnd.github+json",
+        "Content-Type":"application/json"
+      },
+      body: JSON.stringify(body)
+    }).then(function(res){
+      if(!res.ok) return res.text().then(function(t){ throw new Error("Ecriture GitHub echouee (" + res.status + ")"); });
+      return res.json().then(function(json){ return json.content.sha; });
+    });
+  }
+
+  function mergeRemoteTransactions(remoteList){
+    var localIds = {};
+    transactions.forEach(function(t){ localIds[t.id] = true; });
+    var added = 0;
+    remoteList.forEach(function(t){
+      if(!localIds[t.id]){
+        transactions.push(t);
+        added++;
+      }
+    });
+    if(added > 0) saveTransactions(transactions);
+    return added;
+  }
+
+  function setSyncStatus(state, text){
+    var dot = document.getElementById("syncDot");
+    var label = document.getElementById("syncText");
+    dot.className = "sync-dot" + (state ? " " + state : "");
+    label.textContent = text;
+  }
+
+  function updateSyncPanel(){
+    var cfg = loadSyncConfig();
+    var configured = document.getElementById("syncActionsConfigured");
+    var unconfigured = document.getElementById("syncActionsUnconfigured");
+    if(cfg){
+      configured.style.display = "flex";
+      unconfigured.style.display = "none";
+      setSyncStatus("", cfg.owner + "/" + cfg.repo);
+    } else {
+      configured.style.display = "none";
+      unconfigured.style.display = "flex";
+      setSyncStatus("", "Non configuree");
+    }
+  }
+
+  function pullAndMerge(){
+    var cfg = loadSyncConfig();
+    if(!cfg) return Promise.resolve();
+    setSyncStatus("pending", "Synchronisation en cours...");
+    return githubGetFile(cfg).then(function(remote){
+      if(!remote){
+        return; // pas encore de fichier distant, la premiere synchro va le creer
+      }
+      localStorage.setItem(SYNC_SHA_KEY, remote.sha);
+      return decryptData(remote.payload, cfg.passphrase).then(function(remoteData){
+        mergeRemoteTransactions(remoteData);
+      });
+    });
+  }
+
+  function pushRemote(){
+    var cfg = loadSyncConfig();
+    if(!cfg) return Promise.resolve();
+    var sha = localStorage.getItem(SYNC_SHA_KEY) || null;
+    return encryptData(transactions, cfg.passphrase).then(function(payload){
+      return githubPutFile(cfg, payload, sha).then(function(newSha){
+        localStorage.setItem(SYNC_SHA_KEY, newSha);
+      });
+    });
+  }
+
+  function fullSync(){
+    return pullAndMerge().then(function(){
+      return pushRemote();
+    }).then(function(){
+      renderAll();
+      setSyncStatus("ok", "A jour, " + new Date().toLocaleTimeString("fr-FR", {hour:"2-digit", minute:"2-digit"}));
+    }).catch(function(err){
+      setSyncStatus("error", "Erreur: " + err.message);
+    });
+  }
+
+  function pushRemoteIfConfigured(){
+    var cfg = loadSyncConfig();
+    if(!cfg) return;
+    setSyncStatus("pending", "Synchronisation en cours...");
+    pushRemote().then(function(){
+      setSyncStatus("ok", "A jour, " + new Date().toLocaleTimeString("fr-FR", {hour:"2-digit", minute:"2-digit"}));
+    }).catch(function(err){
+      setSyncStatus("error", "Erreur: " + err.message);
+    });
+  }
+
+  var syncOverlay = document.getElementById("syncOverlay");
+
+  function openSyncSetup(prefill){
+    if(prefill){
+      document.getElementById("sOwner").value = prefill.owner || "";
+      document.getElementById("sRepo").value = prefill.repo || "budget-plus-data";
+      document.getElementById("sToken").value = prefill.token || "";
+      document.getElementById("sPass").value = "";
+      document.getElementById("sPass2").value = "";
+    } else {
+      document.getElementById("sOwner").value = "";
+      document.getElementById("sRepo").value = "budget-plus-data";
+      document.getElementById("sToken").value = "";
+      document.getElementById("sPass").value = "";
+      document.getElementById("sPass2").value = "";
+    }
+    syncOverlay.classList.add("open");
+  }
+
+  function closeSyncSetup(){
+    syncOverlay.classList.remove("open");
+  }
+
+  document.getElementById("btnSyncSetup").addEventListener("click", function(){ openSyncSetup(null); });
+  document.getElementById("btnSyncEdit").addEventListener("click", function(){ openSyncSetup(loadSyncConfig()); });
+  document.getElementById("syncCancel").addEventListener("click", closeSyncSetup);
+  syncOverlay.addEventListener("click", function(e){
+    if(e.target === syncOverlay) closeSyncSetup();
+  });
+
+  document.getElementById("syncSave").addEventListener("click", function(){
+    var owner = document.getElementById("sOwner").value.trim();
+    var repo = document.getElementById("sRepo").value.trim();
+    var token = document.getElementById("sToken").value.trim();
+    var pass = document.getElementById("sPass").value;
+    var pass2 = document.getElementById("sPass2").value;
+
+    if(!owner || !repo || !token){
+      alert("Remplis le nom d'utilisateur, le repository et le token.");
+      return;
+    }
+    if(!pass || pass.length < 6){
+      alert("Choisis un mot de passe de 6 caracteres minimum.");
+      return;
+    }
+    if(pass !== pass2){
+      alert("Les deux mots de passe ne correspondent pas.");
+      return;
+    }
+
+    var existing = loadSyncConfig();
+    if(existing) localStorage.removeItem(SYNC_SHA_KEY);
+
+    saveSyncConfig({ owner:owner, repo:repo, token:token, passphrase:pass });
+    updateSyncPanel();
+    closeSyncSetup();
+    showToast("Synchronisation activee");
+    fullSync();
+  });
+
+  document.getElementById("btnSyncNow").addEventListener("click", function(){
+    fullSync();
+  });
+
+  updateSyncPanel();
+  if(loadSyncConfig()){
+    fullSync();
+  }
 
   renderAll();
 
