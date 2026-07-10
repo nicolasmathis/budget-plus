@@ -178,6 +178,7 @@
   }
   .tx-tag-nicolas{color:#3E92CC;background:#E7F1FA;}
   .tx-tag-elise{color:#D66BA0;background:#FBEAF2;}
+  .tx-tag-aucun{color:var(--muted);background:var(--border);}
   .tx-amount{font-size:14px;font-weight:700;white-space:nowrap;}
   .tx-amount.income{color:var(--green);}
   .tx-amount.expense{color:var(--red);}
@@ -260,6 +261,7 @@
   .type-toggle button.active.commune{background:#8E7CC3;color:#fff;}
   .type-toggle button.active.nicolas{background:#3E92CC;color:#fff;}
   .type-toggle button.active.elise{background:#D66BA0;color:#fff;}
+  .type-toggle button.active.aucun{background:var(--muted);color:#fff;}
   .field{margin-bottom:14px;}
   .field label{
     display:block;
@@ -446,6 +448,7 @@
         <div class="type-toggle">
           <button type="button" class="active nicolas" id="togglePayerNicolas" data-payer="Nicolas">Nicolas</button>
           <button type="button" class="elise" id="togglePayerElise" data-payer="Elise">Élise</button>
+          <button type="button" class="aucun" id="togglePayerAucun" data-payer="Aucun">Aucun</button>
         </div>
       </div>
       <div class="field">
@@ -758,6 +761,7 @@
     currentPayer = payer;
     document.getElementById("togglePayerNicolas").classList.toggle("active", payer === "Nicolas");
     document.getElementById("togglePayerElise").classList.toggle("active", payer === "Elise");
+    document.getElementById("togglePayerAucun").classList.toggle("active", payer === "Aucun");
   }
 
   function openSheet(){
@@ -824,6 +828,9 @@
   });
   document.getElementById("togglePayerElise").addEventListener("click", function(){
     setPayer("Elise");
+  });
+  document.getElementById("togglePayerAucun").addEventListener("click", function(){
+    setPayer("Aucun");
   });
 
   document.getElementById("btnSave").addEventListener("click", function(){
