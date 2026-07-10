@@ -156,6 +156,7 @@
     gap:10px;
     padding:10px 0;
     border-bottom:1px solid var(--border);
+    cursor:pointer;
   }
   .tx-row:last-child{border-bottom:none;}
   .tx-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
@@ -376,7 +377,7 @@
         <div class="value" id="valRevenus">0 $</div>
       </div>
       <div class="card depenses">
-        <div class="label">Depenses</div>
+        <div class="label">Dépenses</div>
         <div class="value" id="valDepenses">0 $</div>
       </div>
       <div class="card solde">
@@ -387,14 +388,14 @@
 
     <div class="progress-block">
       <div class="row">
-        <span>Pourcentage de l'apport depense</span>
+        <span>Pourcentage de l'apport dépensé</span>
         <span class="pct" id="pctLabel">0%</span>
       </div>
       <div class="bar-track"><div class="bar-fill" id="barFill" style="width:0%"></div></div>
     </div>
 
     <section class="block">
-      <h2>Repartition des depenses</h2>
+      <h2>Répartition des dépenses</h2>
       <div id="pieContainer"></div>
     </section>
 
@@ -407,7 +408,7 @@
       <h2>Synchronisation</h2>
       <div class="sync-status">
         <span class="sync-dot" id="syncDot"></span>
-        <span id="syncText">Non configuree</span>
+        <span id="syncText">Non configurée</span>
       </div>
       <div class="sync-row" id="syncActionsConfigured" style="display:none;">
         <button id="btnSyncNow">Synchroniser</button>
@@ -419,13 +420,13 @@
     </section>
 
     <section class="block settings-block">
-      <h2>Mes donnees</h2>
+      <h2>Mes données</h2>
       <div class="settings-row">
         <button id="btnExport">Exporter (sauvegarde)</button>
         <button id="btnImportTrigger">Importer</button>
       </div>
       <input type="file" id="importFile" accept="application/json">
-      <p class="note">Tes donnees restent sur cet appareil. Si tu actives la synchronisation, elles sont aussi chiffrees puis envoyees vers ton propre repository GitHub prive, illisible sans ton mot de passe de chiffrement. Exporte regulierement pour garder une copie de secours.</p>
+      <p class="note">Tes données restent sur cet appareil. Si tu actives la synchronisation, elles sont aussi chiffrées puis envoyées vers ton propre repository GitHub privé, illisible sans ton mot de passe de chiffrement. Exporte régulièrement pour garder une copie de secours.</p>
     </section>
   </main>
 
@@ -437,18 +438,18 @@
     <div class="sheet">
       <h3 id="sheetTitle">Ajouter une transaction</h3>
       <div class="type-toggle">
-        <button type="button" class="active expense" id="toggleExpense" data-type="expense">Depense</button>
+        <button type="button" class="active expense" id="toggleExpense" data-type="expense">Dépense</button>
         <button type="button" class="income" id="toggleIncome" data-type="income">Apport</button>
       </div>
       <div class="field">
-        <label>Paye par</label>
+        <label>Payé par</label>
         <div class="type-toggle">
           <button type="button" class="active nicolas" id="togglePayerNicolas" data-payer="Nicolas">Nicolas</button>
-          <button type="button" class="elise" id="togglePayerElise" data-payer="Elise">Elise</button>
+          <button type="button" class="elise" id="togglePayerElise" data-payer="Elise">Élise</button>
         </div>
       </div>
       <div class="field">
-        <label for="fCategory">Categorie</label>
+        <label for="fCategory">Catégorie</label>
         <select id="fCategory"></select>
       </div>
       <div class="field">
@@ -478,11 +479,11 @@
         <input type="text" id="sOwner" placeholder="Ex: nicolasmathis" autocapitalize="off" autocorrect="off">
       </div>
       <div class="field">
-        <label for="sRepo">Nom du repository de donnees</label>
+        <label for="sRepo">Nom du repository de données</label>
         <input type="text" id="sRepo" placeholder="budget-plus-data" autocapitalize="off" autocorrect="off">
       </div>
       <div class="field">
-        <label for="sToken">Token d'acces GitHub</label>
+        <label for="sToken">Token d'accès GitHub</label>
         <input type="password" id="sToken" placeholder="github_pat_..." autocapitalize="off" autocorrect="off">
       </div>
       <div class="field">
@@ -491,9 +492,9 @@
       </div>
       <div class="field">
         <label for="sPass2">Confirme le mot de passe</label>
-        <input type="password" id="sPass2" placeholder="Retape le meme mot de passe" autocapitalize="off" autocorrect="off">
+        <input type="password" id="sPass2" placeholder="Retape le même mot de passe" autocapitalize="off" autocorrect="off">
       </div>
-      <p class="note" style="margin-top:0;">Si tu perds ce mot de passe, tes donnees synchronisees deviennent illisibles pour toujours. Note le dans un endroit sur. Sur un nouvel appareil, utilise exactement le meme mot de passe pour retrouver tes donnees.</p>
+      <p class="note" style="margin-top:0;">Si tu perds ce mot de passe, tes données synchronisées deviennent illisibles pour toujours. Note le dans un endroit sûr. Sur un nouvel appareil, utilise exactement le même mot de passe pour retrouver tes données.</p>
       <div class="sheet-actions">
         <button class="btn-cancel" id="syncCancel">Annuler</button>
         <button class="btn-save" id="syncSave">Activer</button>
@@ -509,13 +510,22 @@
 (function(){
 
   var EXPENSE_CATEGORIES = [
-    "Telephone portable","Nourritures","Depenses Voiture","Soins Medicaux","Divertissements",
+    "Téléphone portable","Nourritures","Dépenses Voiture","Soins Médicaux","Divertissements",
     "Restaurants","Vacances / Week End","Cadeaux","Sport","Frais bancaires","Coiffeur",
-    "Developpement personnel","LifeStyle","Logement & Charges","Ameublement","Transports",
-    "Electroniques","Impots","Investissements","Autres"
+    "Développement personnel","LifeStyle","Logement & Charges","Ameublement","Transports",
+    "Électroniques","Impôts","Investissements","Autres"
   ];
 
   var INCOME_CATEGORIES = ["Salaire","Sous-location","Autre"];
+
+  var CATEGORY_RENAME_MAP = {
+    "Telephone portable":"Téléphone portable",
+    "Depenses Voiture":"Dépenses Voiture",
+    "Soins Medicaux":"Soins Médicaux",
+    "Developpement personnel":"Développement personnel",
+    "Electroniques":"Électroniques",
+    "Impots":"Impôts"
+  };
 
   var CATEGORY_COLORS = [
     "#23B893","#3E92CC","#F2B134","#E15A4C","#8E7CC3","#4FB0C6","#D66BA0","#7CB342",
@@ -539,6 +549,19 @@
   }
 
   var transactions = loadTransactions();
+
+  function migrateCategoryAccents(){
+    var changed = false;
+    transactions.forEach(function(t){
+      if(CATEGORY_RENAME_MAP[t.category]){
+        t.category = CATEGORY_RENAME_MAP[t.category];
+        changed = true;
+      }
+    });
+    if(changed) saveTransactions(transactions);
+    return changed;
+  }
+  var categoriesMigrated = migrateCategoryAccents();
   var currentMonth = new Date().toISOString().slice(0,7);
   var currentType = "expense";
   var currentPayer = "Nicolas";
@@ -607,7 +630,7 @@
     var active = EXPENSE_CATEGORIES.filter(function(c){ return totals[c] > 0; });
 
     if(active.length === 0 || depensesTotal <= 0){
-      container.innerHTML = '<p class="empty">Aucune depense enregistree ce mois-ci.</p>';
+      container.innerHTML = '<p class="empty">Aucune dépense enregistrée ce mois-ci.</p>';
       return;
     }
 
@@ -642,7 +665,7 @@
   function renderTxList(list){
     var container = document.getElementById("txList");
     if(list.length === 0){
-      container.innerHTML = '<p class="empty">Aucune transaction ce mois-ci. Ajoute ta premiere depense ou revenu.</p>';
+      container.innerHTML = '<p class="empty">Aucune transaction ce mois-ci. Ajoute ta première dépense ou apport.</p>';
       return;
     }
     var html = "";
@@ -650,7 +673,8 @@
       var catList = t.type === "expense" ? EXPENSE_CATEGORIES : INCOME_CATEGORIES;
       var color = categoryColor(t.category, catList);
       var sign = t.type === "income" ? "+" : "-";
-      var payerTag = t.payer ? '<span class="tx-tag tx-tag-' + t.payer.toLowerCase() + '">' + t.payer + '</span>' : "";
+      var payerDisplay = t.payer === "Elise" ? "Élise" : t.payer;
+      var payerTag = t.payer ? '<span class="tx-tag tx-tag-' + t.payer.toLowerCase() + '">' + payerDisplay + '</span>' : "";
       html += '<div class="tx-row" data-id="' + t.id + '">' +
         '<span class="tx-dot" style="background:' + color + '"></span>' +
         '<div class="tx-info">' +
@@ -663,14 +687,23 @@
     });
     container.innerHTML = html;
 
+    container.querySelectorAll(".tx-row").forEach(function(row){
+      row.addEventListener("click", function(){
+        var id = row.getAttribute("data-id");
+        var tx = transactions.filter(function(t){ return t.id === id; })[0];
+        if(tx) openSheetForEdit(tx);
+      });
+    });
+
     container.querySelectorAll(".tx-del").forEach(function(btn){
-      btn.addEventListener("click", function(){
+      btn.addEventListener("click", function(e){
+        e.stopPropagation();
         var id = btn.getAttribute("data-id");
         if(confirm("Supprimer cette transaction ?")){
           transactions = transactions.filter(function(t){ return t.id !== id; });
           saveTransactions(transactions);
           renderAll();
-          showToast("Transaction supprimee");
+          showToast("Transaction supprimée");
           pushRemoteIfConfigured();
         }
       });
@@ -718,6 +751,7 @@
   });
 
   var overlay = document.getElementById("overlay");
+  var editingId = null;
 
   function setPayer(payer){
     currentPayer = payer;
@@ -726,6 +760,9 @@
   }
 
   function openSheet(){
+    editingId = null;
+    document.getElementById("sheetTitle").textContent = "Ajouter une transaction";
+    document.getElementById("btnSave").textContent = "Enregistrer";
     currentType = "expense";
     document.getElementById("toggleExpense").classList.add("active");
     document.getElementById("toggleIncome").classList.remove("active");
@@ -740,6 +777,22 @@
     var isCurrentRealMonth = (today.getFullYear() === y && (today.getMonth()+1) === m);
     var defaultDate = isCurrentRealMonth ? today : new Date(y, m-1, 1);
     document.getElementById("fDate").value = defaultDate.toISOString().slice(0,10);
+    overlay.classList.add("open");
+  }
+
+  function openSheetForEdit(tx){
+    editingId = tx.id;
+    document.getElementById("sheetTitle").textContent = "Modifier la transaction";
+    document.getElementById("btnSave").textContent = "Mettre à jour";
+    currentType = tx.type;
+    document.getElementById("toggleExpense").classList.toggle("active", tx.type === "expense");
+    document.getElementById("toggleIncome").classList.toggle("active", tx.type === "income");
+    setPayer(tx.payer || "Nicolas");
+    populateCategorySelect();
+    document.getElementById("fCategory").value = tx.category;
+    document.getElementById("fDescription").value = tx.description || "";
+    document.getElementById("fAmount").value = tx.amount;
+    document.getElementById("fDate").value = tx.date;
     overlay.classList.add("open");
   }
 
@@ -788,17 +841,29 @@
       return;
     }
 
-    var tx = {
-      id: Date.now().toString(36) + Math.random().toString(36).slice(2,8),
-      type: currentType,
-      category: category,
-      description: description,
-      amount: amount,
-      date: date,
-      payer: currentPayer
-    };
+    if(editingId){
+      var existing = transactions.filter(function(t){ return t.id === editingId; })[0];
+      if(existing){
+        existing.type = currentType;
+        existing.category = category;
+        existing.description = description;
+        existing.amount = amount;
+        existing.date = date;
+        existing.payer = currentPayer;
+      }
+    } else {
+      var tx = {
+        id: Date.now().toString(36) + Math.random().toString(36).slice(2,8),
+        type: currentType,
+        category: category,
+        description: description,
+        amount: amount,
+        date: date,
+        payer: currentPayer
+      };
+      transactions.push(tx);
+    }
 
-    transactions.push(tx);
     saveTransactions(transactions);
 
     var txMonth = date.slice(0,7);
@@ -806,9 +871,11 @@
       currentMonth = txMonth;
     }
 
+    var wasEditing = !!editingId;
+    editingId = null;
     closeSheet();
     renderAll();
-    showToast("Transaction enregistree");
+    showToast(wasEditing ? "Transaction mise à jour" : "Transaction enregistrée");
     pushRemoteIfConfigured();
   });
 
@@ -838,7 +905,7 @@
       try{
         var data = JSON.parse(evt.target.result);
         if(!Array.isArray(data)) throw new Error("format invalide");
-        var mode = confirm("Remplacer toutes les donnees actuelles par ce fichier ? Annuler pour fusionner avec les donnees existantes.");
+        var mode = confirm("Remplacer toutes les données actuelles par ce fichier ? Annuler pour fusionner avec les données existantes.");
         if(mode){
           transactions = data;
         } else {
@@ -850,10 +917,10 @@
         }
         saveTransactions(transactions);
         renderAll();
-        showToast("Import reussi");
+        showToast("Import réussi");
         pushRemoteIfConfigured();
       }catch(err){
-        alert("Ce fichier ne peut pas etre lu. Verifie que c'est bien un export Budget Plus.");
+        alert("Ce fichier ne peut pas être lu. Vérifie que c'est bien un export Budget Plus.");
       }
       document.getElementById("importFile").value = "";
     };
@@ -948,7 +1015,7 @@
       headers: { "Authorization":"Bearer " + cfg.token, "Accept":"application/vnd.github+json" }
     }).then(function(res){
       if(res.status === 404) return null;
-      if(!res.ok) return res.text().then(function(t){ throw new Error("Lecture GitHub echouee (" + res.status + ")"); });
+      if(!res.ok) return res.text().then(function(t){ throw new Error("Lecture GitHub échouée (" + res.status + ")"); });
       return res.json().then(function(json){
         var content = atob(json.content.replace(/\n/g,""));
         return { sha: json.sha, payload: JSON.parse(content) };
@@ -973,7 +1040,7 @@
       },
       body: JSON.stringify(body)
     }).then(function(res){
-      if(!res.ok) return res.text().then(function(t){ throw new Error("Ecriture GitHub echouee (" + res.status + ")"); });
+      if(!res.ok) return res.text().then(function(t){ throw new Error("Écriture GitHub échouée (" + res.status + ")"); });
       return res.json().then(function(json){ return json.content.sha; });
     });
   }
@@ -1010,7 +1077,7 @@
     } else {
       configured.style.display = "none";
       unconfigured.style.display = "flex";
-      setSyncStatus("", "Non configuree");
+      setSyncStatus("", "Non configurée");
     }
   }
 
@@ -1020,7 +1087,7 @@
     setSyncStatus("pending", "Synchronisation en cours...");
     return githubGetFile(cfg).then(function(remote){
       if(!remote){
-        return; // pas encore de fichier distant, la premiere synchro va le creer
+        return; // pas encore de fichier distant, la première synchro va le créer
       }
       localStorage.setItem(SYNC_SHA_KEY, remote.sha);
       return decryptData(remote.payload, cfg.passphrase).then(function(remoteData){
@@ -1118,7 +1185,7 @@
     saveSyncConfig({ owner:owner, repo:repo, token:token, passphrase:pass });
     updateSyncPanel();
     closeSyncSetup();
-    showToast("Synchronisation activee");
+    showToast("Synchronisation activée");
     fullSync();
   });
 
