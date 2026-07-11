@@ -434,6 +434,19 @@
   .budget-spent{font-size:11px;color:var(--muted);margin-top:5px;}
   .budget-spent.over{color:var(--red);font-weight:700;}
 
+  /* Tableau de bord annuel */
+  .month-row{padding:12px 4px;border-bottom:1px solid var(--border);cursor:pointer;border-radius:8px;}
+  .month-row:last-child{border-bottom:none;}
+  .month-row:hover{background:var(--bg);}
+  .month-row-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;}
+  .month-row-name{font-size:13.5px;font-weight:700;color:var(--navy);text-transform:capitalize;}
+  .month-row-chevron{color:var(--muted);font-size:15px;}
+  .month-row-stats{font-size:11.5px;color:var(--muted);display:flex;flex-wrap:wrap;gap:10px;}
+  .month-row-stats b{color:var(--text);font-weight:600;}
+  .month-row-pct{font-weight:700;}
+  .month-row-pct.pos{color:var(--green);}
+  .month-row-pct.neg{color:var(--red);}
+
   /* Analyses */
   .trend-chart{display:flex;align-items:flex-end;gap:10px;height:150px;padding:6px 2px 0;}
   .trend-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:3px;}
@@ -517,6 +530,7 @@
     <div class="logo"><span>Budget</span><span class="plus">Plus</span></div>
     <nav class="sidebar-nav" id="sidebarNav">
       <button data-view="dashboard"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>Tableau de bord</span></button>
+      <button data-view="mensuel"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="3" x2="8" y2="6"/><line x1="16" y1="3" x2="16" y2="6"/></svg><span>Mensuel</span></button>
       <button data-view="transactions"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="14" y2="17"/></svg><span>Transactions</span></button>
       <button data-view="budgets"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="0.6" fill="currentColor"/></svg><span>Budgets</span></button>
       <button data-view="analyses"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="20" x2="5" y2="11"/><line x1="12" y1="20" x2="12" y2="5"/><line x1="19" y1="20" x2="19" y2="14"/></svg><span>Analyses</span></button>
@@ -530,16 +544,49 @@
   <header class="top">
     <div class="logo"><span>Budget</span><span class="plus">Plus</span></div>
     <h1 class="page-title" id="pageTitle">Tableau de bord</h1>
-    <div class="month-nav">
+    <div class="month-nav" id="monthNavRow">
       <button id="prevMonth" aria-label="Mois précédent">&#8249;</button>
       <div class="month-label" id="monthLabel"></div>
       <button id="nextMonth" aria-label="Mois suivant">&#8250;</button>
+    </div>
+    <div class="month-nav" id="yearNavRow" style="display:none;">
+      <button id="prevYear" aria-label="Année précédente">&#8249;</button>
+      <div class="month-label" id="yearLabel"></div>
+      <button id="nextYear" aria-label="Année suivante">&#8250;</button>
     </div>
   </header>
 
   <main>
 
     <section class="view" id="view-dashboard">
+      <div class="cards">
+        <div class="card revenus">
+          <div class="label">Apport annuel</div>
+          <div class="value" id="yearValRevenus">0 $</div>
+        </div>
+        <div class="card depenses">
+          <div class="label">Dépenses annuelles</div>
+          <div class="value" id="yearValDepenses">0 $</div>
+        </div>
+        <div class="card solde">
+          <div class="label">Épargne annuelle</div>
+          <div class="value" id="yearValSolde">0 $</div>
+        </div>
+      </div>
+
+      <section class="block">
+        <h2>Répartition des dépenses — année</h2>
+        <div id="yearPieContainer"></div>
+      </section>
+
+      <section class="block">
+        <h2>Détail par mois</h2>
+        <p class="note" style="margin-top:-6px;margin-bottom:6px;">Clique sur un mois pour l'ouvrir dans Mensuel.</p>
+        <div id="monthsList"></div>
+      </section>
+    </section>
+
+    <section class="view" id="view-mensuel" hidden>
       <div class="cards">
         <div class="card revenus">
           <div class="label">Apport</div>
@@ -680,7 +727,7 @@
 
   <nav class="bottom-nav" id="bottomNav">
     <button data-view="dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>Accueil</span></button>
-    <button data-view="transactions"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="14" y2="17"/></svg><span>Transacts</span></button>
+    <button data-view="mensuel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="3" x2="8" y2="6"/><line x1="16" y1="3" x2="16" y2="6"/></svg><span>Mensuel</span></button>
     <button class="add-btn" id="bottomAdd" aria-label="Ajouter"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
     <button data-view="analyses"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="20" x2="5" y2="11"/><line x1="12" y1="20" x2="12" y2="5"/><line x1="19" y1="20" x2="19" y2="14"/></svg><span>Analyses</span></button>
     <button id="bottomMore"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.4" fill="currentColor" stroke="none"/></svg><span>Plus</span></button>
@@ -690,6 +737,7 @@
     <div class="sheet">
       <h3>Plus</h3>
       <div class="settings-row" style="flex-direction:column;">
+        <button data-view="transactions" style="margin-bottom:8px;">Transactions</button>
         <button data-view="budgets" style="margin-bottom:8px;">Budgets</button>
         <button data-view="rapports" style="margin-bottom:8px;">Rapports</button>
         <button data-view="settings">Paramètres</button>
@@ -847,6 +895,7 @@
   migrateCategoryAccents();
 
   var currentMonth = new Date().toISOString().slice(0,7);
+  var currentYear = new Date().getFullYear().toString();
   var currentType = "expense";
   var currentPayer = "Nicolas";
   var currentView = "dashboard";
@@ -855,6 +904,7 @@
 
   var VIEW_TITLES = {
     dashboard:"Tableau de bord",
+    mensuel:"Mensuel",
     transactions:"Transactions",
     budgets:"Budgets",
     analyses:"Analyses",
@@ -951,6 +1001,11 @@
     document.querySelectorAll(".bottom-nav button[data-view]").forEach(function(b){
       b.classList.toggle("active", b.getAttribute("data-view") === view);
     });
+    var inMoreMenu = (view === "transactions" || view === "budgets" || view === "rapports" || view === "settings");
+    document.getElementById("bottomMore").classList.toggle("active", inMoreMenu);
+
+    document.getElementById("yearNavRow").style.display = (view === "dashboard") ? "flex" : "none";
+    document.getElementById("monthNavRow").style.display = (view === "dashboard") ? "none" : "flex";
 
     renderCurrentView();
     window.scrollTo(0,0);
@@ -958,7 +1013,9 @@
 
   function renderCurrentView(){
     document.getElementById("monthLabel").textContent = monthLabelText(currentMonth);
-    if(currentView === "dashboard") renderDashboard();
+    document.getElementById("yearLabel").textContent = currentYear;
+    if(currentView === "dashboard") renderAnnualOverview();
+    else if(currentView === "mensuel") renderMensuel();
     else if(currentView === "transactions") renderTransactionsView();
     else if(currentView === "budgets") renderBudgetsView();
     else if(currentView === "analyses") renderAnalysesView();
@@ -980,6 +1037,15 @@
       moreOverlay.classList.remove("open");
       showView(btn.getAttribute("data-view"));
     });
+  });
+
+  document.getElementById("prevYear").addEventListener("click", function(){
+    currentYear = String(parseInt(currentYear,10) - 1);
+    renderCurrentView();
+  });
+  document.getElementById("nextYear").addEventListener("click", function(){
+    currentYear = String(parseInt(currentYear,10) + 1);
+    renderCurrentView();
   });
 
   document.getElementById("prevMonth").addEventListener("click", function(){
@@ -1004,7 +1070,7 @@
     el.className = "delta " + (good ? "up" : "down");
   }
 
-  function renderDashboard(){
+  function renderMensuel(){
     var list = filteredTx();
     var s = computeSummary(list);
     document.getElementById("valRevenus").textContent = fmt(s.revenus);
@@ -1019,17 +1085,57 @@
     renderDelta("deltaDepenses", s.depenses, ps.depenses, true);
     renderDelta("deltaSolde", s.solde, ps.solde, false);
 
-    renderPie(list, s.depenses);
+    renderPie("pieContainer", list, s.depenses);
     renderRecentList(list);
   }
 
-  function renderPie(list, depensesTotal){
-    var container = document.getElementById("pieContainer");
+  function renderAnnualOverview(){
+    var yearList = transactions.filter(function(t){ return t.date.slice(0,4) === currentYear; });
+    var s = computeSummary(yearList);
+    document.getElementById("yearValRevenus").textContent = fmt(s.revenus);
+    document.getElementById("yearValDepenses").textContent = fmt(s.depenses);
+    document.getElementById("yearValSolde").textContent = fmt(s.solde);
+
+    renderPie("yearPieContainer", yearList, s.depenses);
+    renderMonthsList();
+  }
+
+  function renderMonthsList(){
+    var container = document.getElementById("monthsList");
+    var html = "";
+    for(var m=1; m<=12; m++){
+      var ym = currentYear + "-" + pad(m);
+      var list = txForMonth(ym);
+      var ms = computeSummary(list);
+      var pctSaved = ms.revenus > 0 ? Math.round((ms.solde / ms.revenus) * 100) : (ms.solde !== 0 ? (ms.solde > 0 ? 100 : -100) : 0);
+      var pctClass = pctSaved >= 0 ? "pos" : "neg";
+      html += '<div class="month-row" data-month="' + ym + '">' +
+        '<div class="month-row-head"><span class="month-row-name">' + monthLabelText(ym) + '</span><span class="month-row-chevron">&#8250;</span></div>' +
+        '<div class="month-row-stats">' +
+          '<span>Apport <b>' + fmt(ms.revenus) + '</b></span>' +
+          '<span>Dépenses <b>' + fmt(ms.depenses) + '</b></span>' +
+          '<span>Épargne <b>' + fmt(ms.solde) + '</b></span>' +
+          '<span class="month-row-pct ' + pctClass + '">' + pctSaved + '% économisé</span>' +
+        '</div>' +
+      '</div>';
+    }
+    container.innerHTML = html;
+
+    container.querySelectorAll(".month-row").forEach(function(row){
+      row.addEventListener("click", function(){
+        currentMonth = row.getAttribute("data-month");
+        showView("mensuel");
+      });
+    });
+  }
+
+  function renderPie(containerId, list, depensesTotal){
+    var container = document.getElementById(containerId);
     var totals = categoryTotals(list);
     var active = EXPENSE_CATEGORIES.filter(function(c){ return totals[c] > 0; });
 
     if(active.length === 0 || depensesTotal <= 0){
-      container.innerHTML = '<p class="empty">Aucune dépense enregistrée ce mois-ci.</p>';
+      container.innerHTML = '<p class="empty">Aucune dépense enregistrée sur cette période.</p>';
       return;
     }
 
@@ -1058,7 +1164,7 @@
       '<div class="pie-wrap">' +
         '<div class="donut-holder">' +
           '<div class="pie" style="background:' + gradient + '"></div>' +
-          '<div class="donut-hole"><span class="amt">' + fmt(depensesTotal).replace(" $"," $") + '</span><span class="lbl">dépensé</span></div>' +
+          '<div class="donut-hole"><span class="amt">' + fmt(depensesTotal) + '</span><span class="lbl">dépensé</span></div>' +
         '</div>' +
         '<div class="legend">' + legendHtml + '</div>' +
       '</div>';
