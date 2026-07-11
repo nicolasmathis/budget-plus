@@ -447,6 +447,17 @@
   .month-row-pct.pos{color:var(--green);}
   .month-row-pct.neg{color:var(--red);}
 
+  /* Copie de depenses */
+  .copy-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);font-size:12.5px;cursor:pointer;}
+  .copy-row:last-child{border-bottom:none;}
+  .copy-row input[type="checkbox"]{width:18px;height:18px;flex-shrink:0;accent-color:var(--green);}
+  .copy-info{flex:1;min-width:0;}
+  .copy-cat{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;}
+  .copy-desc{color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;}
+  .copy-amt{font-weight:700;white-space:nowrap;flex-shrink:0;}
+  .copy-amt.income{color:var(--green);}
+  .copy-amt.expense{color:var(--red);}
+
   /* Analyses */
   .trend-chart{display:flex;align-items:flex-end;gap:10px;height:150px;padding:6px 2px 0;}
   .trend-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:3px;}
@@ -603,6 +614,10 @@
           <div class="value" id="valSolde">0 $</div>
           <div class="delta" id="deltaSolde"></div>
         </div>
+      </div>
+
+      <div class="settings-row" style="margin-top:12px;">
+        <button id="btnOpenCopy">Copier depuis le mois précédent</button>
       </div>
 
       <div class="progress-block">
@@ -813,6 +828,21 @@
       <div class="sheet-actions">
         <button class="btn-cancel" id="syncCancel">Annuler</button>
         <button class="btn-save" id="syncSave">Activer</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="copyOverlay">
+    <div class="sheet">
+      <h3 id="copyTitle">Copier depuis le mois précédent</h3>
+      <label class="copy-row" style="border-bottom:1px solid var(--border);margin-bottom:4px;">
+        <input type="checkbox" id="copySelectAll">
+        <div class="copy-info"><span class="copy-cat">Tout sélectionner</span></div>
+      </label>
+      <div id="copyList"></div>
+      <div class="sheet-actions">
+        <button class="btn-cancel" id="copyCancel">Annuler</button>
+        <button class="btn-save" id="copyConfirm">Copier la sélection</button>
       </div>
     </div>
   </div>
@@ -1579,6 +1609,91 @@
     closeSheet();
     renderCurrentView();
     showToast(wasEditing ? "Transaction mise à jour" : "Transaction enregistrée");
+    pushRemoteIfConfigured();
+  });
+
+  // ---------- Copier depuis le mois precedent ----------
+
+  var copyOverlay = document.getElementById("copyOverlay");
+
+  function dateShiftedToMonth(originalDate, targetMonth){
+    var day = parseInt(originalDate.slice(8,10),10);
+    var parts = targetMonth.split("-");
+    var y = parseInt(parts[0],10), m = parseInt(parts[1],10);
+    var lastDay = new Date(y, m, 0).getDate();
+    var d = Math.min(day, lastDay);
+    return targetMonth + "-" + pad(d);
+  }
+
+  function openCopySheet(){
+    var prevMonth = shiftMonth(currentMonth, -1);
+    var list = txForMonth(prevMonth);
+    document.getElementById("copyTitle").textContent = "Copier depuis " + monthLabelText(prevMonth);
+    document.getElementById("copySelectAll").checked = false;
+
+    var container = document.getElementById("copyList");
+    if(list.length === 0){
+      container.innerHTML = '<p class="empty">Aucune transaction en ' + monthLabelText(prevMonth) + '.</p>';
+    } else {
+      container.innerHTML = list.map(function(t){
+        var sign = t.type === "income" ? "+" : "-";
+        return '<label class="copy-row">' +
+          '<input type="checkbox" value="' + t.id + '">' +
+          '<div class="copy-info">' +
+            '<span class="copy-cat">' + t.category + '</span>' +
+            '<span class="copy-desc">' + (t.description || t.date) + '</span>' +
+          '</div>' +
+          '<span class="copy-amt ' + t.type + '">' + sign + fmt(t.amount) + '</span>' +
+        '</label>';
+      }).join("");
+    }
+    copyOverlay.classList.add("open");
+  }
+
+  function closeCopySheet(){
+    copyOverlay.classList.remove("open");
+  }
+
+  document.getElementById("btnOpenCopy").addEventListener("click", openCopySheet);
+  document.getElementById("copyCancel").addEventListener("click", closeCopySheet);
+  copyOverlay.addEventListener("click", function(e){ if(e.target === copyOverlay) closeCopySheet(); });
+
+  document.getElementById("copySelectAll").addEventListener("change", function(){
+    var checked = this.checked;
+    copyOverlay.querySelectorAll('#copyList input[type="checkbox"]').forEach(function(cb){ cb.checked = checked; });
+  });
+
+  document.getElementById("copyConfirm").addEventListener("click", function(){
+    var checked = copyOverlay.querySelectorAll('#copyList input[type="checkbox"]:checked');
+    if(checked.length === 0){
+      alert("Sélectionne au moins une transaction à copier.");
+      return;
+    }
+    var prevMonth = shiftMonth(currentMonth, -1);
+    var sourceList = txForMonth(prevMonth);
+    var sourceById = {};
+    sourceList.forEach(function(t){ sourceById[t.id] = t; });
+
+    var count = 0;
+    checked.forEach(function(cb){
+      var original = sourceById[cb.value];
+      if(!original) return;
+      transactions.push({
+        id: Date.now().toString(36) + Math.random().toString(36).slice(2,8) + count,
+        type: original.type,
+        category: original.category,
+        description: original.description,
+        amount: original.amount,
+        date: dateShiftedToMonth(original.date, currentMonth),
+        payer: original.payer
+      });
+      count++;
+    });
+
+    saveTransactions(transactions);
+    closeCopySheet();
+    renderCurrentView();
+    showToast(count + " transaction" + (count > 1 ? "s" : "") + " copiée" + (count > 1 ? "s" : ""));
     pushRemoteIfConfigured();
   });
 
