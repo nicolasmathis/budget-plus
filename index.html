@@ -636,7 +636,10 @@
       <section class="block">
         <div class="block-head">
           <h2>Dernières transactions</h2>
-          <button class="link-btn" id="goToTransactions">Voir tout</button>
+          <div style="display:flex;gap:14px;">
+            <button class="link-btn" id="toggleExpandRecent" style="display:none;">Afficher tout</button>
+            <button class="link-btn" id="goToTransactions">Voir tout</button>
+          </div>
         </div>
         <div id="recentList"></div>
       </section>
@@ -1062,6 +1065,10 @@
     btn.addEventListener("click", function(){ showView(btn.getAttribute("data-view")); });
   });
   document.getElementById("goToTransactions").addEventListener("click", function(){ showView("transactions"); });
+  document.getElementById("toggleExpandRecent").addEventListener("click", function(){
+    mensuelListExpanded = !mensuelListExpanded;
+    renderMensuel();
+  });
 
   var moreOverlay = document.getElementById("moreOverlay");
   document.getElementById("bottomMore").addEventListener("click", function(){ moreOverlay.classList.add("open"); });
@@ -1085,10 +1092,12 @@
 
   document.getElementById("prevMonth").addEventListener("click", function(){
     currentMonth = shiftMonth(currentMonth, -1);
+    mensuelListExpanded = false;
     renderCurrentView();
   });
   document.getElementById("nextMonth").addEventListener("click", function(){
     currentMonth = shiftMonth(currentMonth, 1);
+    mensuelListExpanded = false;
     renderCurrentView();
   });
 
@@ -1246,13 +1255,27 @@
     });
   }
 
+  var mensuelListExpanded = false;
+
   function renderRecentList(list){
     var container = document.getElementById("recentList");
+    var toggleBtn = document.getElementById("toggleExpandRecent");
+
     if(list.length === 0){
       container.innerHTML = '<p class="empty">Aucune transaction ce mois-ci. Ajoute ta première dépense ou apport.</p>';
+      toggleBtn.style.display = "none";
       return;
     }
-    var top = list.slice(0,5);
+
+    if(list.length <= 5){
+      toggleBtn.style.display = "none";
+      mensuelListExpanded = false;
+    } else {
+      toggleBtn.style.display = "inline";
+      toggleBtn.textContent = mensuelListExpanded ? "Réduire" : "Afficher tout";
+    }
+
+    var top = mensuelListExpanded ? list : list.slice(0,5);
     container.innerHTML = top.map(txRowHtml).join("");
     wireTxRows(container);
   }
