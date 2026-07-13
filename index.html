@@ -139,26 +139,13 @@
     align-items:center;
     gap:18px;
   }
-  .donut-holder{position:relative;width:120px;height:120px;flex-shrink:0;}
+  .donut-holder{position:relative;width:170px;height:170px;flex-shrink:0;}
   .pie{
-    width:120px;
-    height:120px;
+    width:170px;
+    height:170px;
     border-radius:50%;
+    box-shadow:0 4px 14px rgba(20,33,61,0.12);
   }
-  .donut-hole{
-    position:absolute;
-    top:50%;left:50%;
-    transform:translate(-50%,-50%);
-    width:72px;height:72px;
-    background:var(--card);
-    border-radius:50%;
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    justify-content:center;
-  }
-  .donut-hole .amt{font-size:12px;font-weight:700;color:var(--navy);line-height:1.2;}
-  .donut-hole .lbl{font-size:8.5px;color:var(--muted);}
   .legend{
     flex:1;
     display:flex;
@@ -531,6 +518,24 @@
     .fab{display:flex;left:auto;right:24px;transform:none;max-width:none;}
     .fab button{padding:13px 22px;}
   }
+
+  #printArea{display:none;}
+
+  @media print{
+    body *{visibility:hidden;}
+    #printArea, #printArea *{visibility:visible;}
+    #printArea{
+      display:block;
+      position:absolute;
+      top:0;left:0;
+      width:100%;
+      padding:20px;
+      background:#fff;
+    }
+    #printArea .cards{grid-template-columns:repeat(3,1fr);}
+    #printArea .card{box-shadow:none;border:1px solid var(--border);}
+    #printArea .pie{box-shadow:none;}
+  }
 </style>
 </head>
 <body>
@@ -602,17 +607,14 @@
         <div class="card revenus">
           <div class="label">Apport</div>
           <div class="value" id="valRevenus">0 $</div>
-          <div class="delta" id="deltaRevenus"></div>
         </div>
         <div class="card depenses">
           <div class="label">Dépenses</div>
           <div class="value" id="valDepenses">0 $</div>
-          <div class="delta" id="deltaDepenses"></div>
         </div>
         <div class="card solde">
           <div class="label">Solde</div>
           <div class="value" id="valSolde">0 $</div>
-          <div class="delta" id="deltaSolde"></div>
         </div>
       </div>
 
@@ -662,15 +664,22 @@
 
     <section class="view" id="view-budgets" hidden>
       <section class="block">
-        <h2>Limites mensuelles par catégorie</h2>
-        <p class="note" style="margin-top:-6px;margin-bottom:10px;">Laisse le champ vide pour une catégorie sans limite. Les limites s'appliquent au mois affiché en haut.</p>
+        <h2>Analyse budgétaire annuelle</h2>
+        <p class="note" style="margin-top:-6px;margin-bottom:10px;">Total dépensé et moyenne mensuelle par catégorie sur l'année affichée en haut. Ajoute une limite mensuelle optionnelle pour comparer.</p>
         <div id="budgetsList"></div>
       </section>
     </section>
 
     <section class="view" id="view-analyses" hidden>
       <section class="block">
-        <h2>Évolution sur 6 mois</h2>
+        <div class="block-head">
+          <h2>Évolution</h2>
+          <select id="trendPeriod" style="width:auto;padding:6px 10px;border-radius:8px;border:1px solid var(--border);font-size:12px;background:var(--bg);color:var(--text);">
+            <option value="3">3 derniers mois</option>
+            <option value="6" selected>6 derniers mois</option>
+            <option value="12">12 derniers mois</option>
+          </select>
+        </div>
         <div id="trendChart"></div>
         <div class="trend-legend">
           <span><i style="background:var(--green)"></i>Apport</span>
@@ -678,11 +687,7 @@
         </div>
       </section>
       <section class="block">
-        <h2>Répartition par payeur (mois affiché)</h2>
-        <div id="payerBreakdown"></div>
-      </section>
-      <section class="block">
-        <h2>Top catégories (mois affiché)</h2>
+        <h2>Top catégories — année affichée</h2>
         <div id="topCategories"></div>
       </section>
     </section>
@@ -704,6 +709,24 @@
         <div class="report-actions" id="reportYearlyActions" style="display:none;">
           <button class="btn-cancel" style="border-radius:10px;padding:10px;font-size:12.5px;" id="btnDownloadYearly">Télécharger (.txt)</button>
           <button class="btn-cancel" style="border-radius:10px;padding:10px;font-size:12.5px;" id="btnCopyYearly">Copier</button>
+        </div>
+      </section>
+      <section class="block">
+        <h2>Répartition par payeur — mois affiché</h2>
+        <p class="note" style="margin-top:-6px;margin-bottom:8px;">Détail catégorie, description et montant de chaque dépense, par payeur.</p>
+        <button class="link-btn" style="color:var(--navy);font-weight:700;font-size:13px;" id="btnGenPayer">Générer</button>
+        <div class="report-box" id="reportPayer" style="display:none;"></div>
+        <div class="report-actions" id="reportPayerActions" style="display:none;">
+          <button class="btn-cancel" style="border-radius:10px;padding:10px;font-size:12.5px;" id="btnDownloadPayer">Télécharger (.txt)</button>
+          <button class="btn-cancel" style="border-radius:10px;padding:10px;font-size:12.5px;" id="btnCopyPayer">Copier</button>
+        </div>
+      </section>
+      <section class="block">
+        <h2>Export PDF</h2>
+        <p class="note" style="margin-top:-6px;margin-bottom:8px;">Reprend le visuel cartes + camembert, via l'impression du navigateur (choisis "Enregistrer en PDF" comme destination).</p>
+        <div class="settings-row">
+          <button id="btnPdfMonth">Mois affiché en PDF</button>
+          <button id="btnPdfYear">Année affichée en PDF</button>
         </div>
       </section>
     </section>
@@ -857,19 +880,30 @@
 
   <div class="toast" id="toast"></div>
 
+  <div id="printArea">
+    <div class="logo" style="color:var(--navy);margin-bottom:4px;"><span>Budget</span><span class="plus">Plus</span></div>
+    <h1 id="printTitle" style="font-size:20px;margin:0 0 16px;"></h1>
+    <div class="cards" id="printCards" style="margin-top:0;grid-template-columns:repeat(3,1fr);"></div>
+    <h2 style="font-size:15px;margin:20px 0 10px;">Répartition des dépenses</h2>
+    <div id="printPieContainer"></div>
+  </div>
+
 </div>
 
 <script>
 (function(){
 
   var EXPENSE_CATEGORIES = [
-    "Téléphone portable","Nourritures","Dépenses Voiture","Soins Médicaux","Divertissements",
-    "Restaurants","Vacances / Week End","Cadeaux","Sport","Frais bancaires","Coiffeur",
-    "Développement personnel","LifeStyle","Logement & Charges","Ameublement","Transports",
-    "Électroniques","Impôts","Investissements","Autres"
+    "Nourritures","Dépenses Voiture","Soins Médicaux","Divertissements",
+    "Restaurants","Vacances / Week End","Cadeaux","Sport","Frais bancaires",
+    "Développement personnel","Logement & Charges","Ameublement","Transports",
+    "Électroniques","Impôts","Autres"
   ];
 
-  var INCOME_CATEGORIES = ["Apport","Sous-location","Autre"];
+  var LEGACY_EXPENSE_CATEGORIES = ["Téléphone portable","Coiffeur","LifeStyle","Investissements"];
+  var ALL_EXPENSE_CATEGORIES = EXPENSE_CATEGORIES.concat(LEGACY_EXPENSE_CATEGORIES);
+
+  var INCOME_CATEGORIES = ["Apport","Sous-location","Impôts","Autre"];
 
   var CATEGORY_RENAME_MAP = {
     "Telephone portable":"Téléphone portable",
@@ -1006,7 +1040,7 @@
 
   function categoryTotals(list){
     var totals = {};
-    EXPENSE_CATEGORIES.forEach(function(c){ totals[c] = 0; });
+    ALL_EXPENSE_CATEGORIES.forEach(function(c){ totals[c] = 0; });
     list.forEach(function(t){
       if(t.type === "expense"){
         totals[t.category] = (totals[t.category] || 0) + t.amount;
@@ -1042,8 +1076,9 @@
     var inMoreMenu = (view === "transactions" || view === "budgets" || view === "rapports" || view === "settings");
     document.getElementById("bottomMore").classList.toggle("active", inMoreMenu);
 
-    document.getElementById("yearNavRow").style.display = (view === "dashboard") ? "flex" : "none";
-    document.getElementById("monthNavRow").style.display = (view === "dashboard") ? "none" : "flex";
+    var yearBasedView = (view === "dashboard" || view === "budgets" || view === "analyses");
+    document.getElementById("yearNavRow").style.display = yearBasedView ? "flex" : "none";
+    document.getElementById("monthNavRow").style.display = yearBasedView ? "none" : "flex";
 
     renderCurrentView();
     window.scrollTo(0,0);
@@ -1103,15 +1138,9 @@
 
   // ---------- Tableau de bord ----------
 
-  function renderDelta(elId, current, previous, invert){
+  function applySoldeColor(elId, value){
     var el = document.getElementById(elId);
-    if(previous === 0){ el.textContent = ""; el.className = "delta"; return; }
-    var pct = Math.round(((current - previous) / previous) * 100);
-    if(pct === 0){ el.textContent = "stable vs mois dernier"; el.className = "delta"; return; }
-    var isUp = pct > 0;
-    var good = invert ? !isUp : isUp;
-    el.textContent = (isUp ? "+" : "") + pct + "% vs mois dernier";
-    el.className = "delta " + (good ? "up" : "down");
+    el.style.color = value >= 0 ? "var(--green)" : "var(--red)";
   }
 
   function renderMensuel(){
@@ -1120,14 +1149,9 @@
     document.getElementById("valRevenus").textContent = fmt(s.revenus);
     document.getElementById("valDepenses").textContent = fmt(s.depenses);
     document.getElementById("valSolde").textContent = fmt(s.solde);
+    applySoldeColor("valSolde", s.solde);
     document.getElementById("pctLabel").textContent = s.pct + "%";
     document.getElementById("barFill").style.width = Math.min(s.pct,100) + "%";
-
-    var prevList = txForMonth(shiftMonth(currentMonth, -1));
-    var ps = computeSummary(prevList);
-    renderDelta("deltaRevenus", s.revenus, ps.revenus, false);
-    renderDelta("deltaDepenses", s.depenses, ps.depenses, true);
-    renderDelta("deltaSolde", s.solde, ps.solde, false);
 
     renderPie("pieContainer", list, s.depenses);
     renderRecentList(list);
@@ -1139,6 +1163,7 @@
     document.getElementById("yearValRevenus").textContent = fmt(s.revenus);
     document.getElementById("yearValDepenses").textContent = fmt(s.depenses);
     document.getElementById("yearValSolde").textContent = fmt(s.solde);
+    applySoldeColor("yearValSolde", s.solde);
 
     renderPie("yearPieContainer", yearList, s.depenses);
     renderMonthsList();
@@ -1176,7 +1201,7 @@
   function renderPie(containerId, list, depensesTotal){
     var container = document.getElementById(containerId);
     var totals = categoryTotals(list);
-    var active = EXPENSE_CATEGORIES.filter(function(c){ return totals[c] > 0; });
+    var active = ALL_EXPENSE_CATEGORIES.filter(function(c){ return totals[c] > 0; });
 
     if(active.length === 0 || depensesTotal <= 0){
       container.innerHTML = '<p class="empty">Aucune dépense enregistrée sur cette période.</p>';
@@ -1192,7 +1217,7 @@
     active.forEach(function(cat){
       var val = totals[cat];
       var pct = (val / depensesTotal) * 100;
-      var color = categoryColor(cat, EXPENSE_CATEGORIES);
+      var color = categoryColor(cat, ALL_EXPENSE_CATEGORIES);
       gradientParts.push(color + " " + cursor.toFixed(2) + "% " + (cursor+pct).toFixed(2) + "%");
       cursor += pct;
       legendHtml += '<div class="legend-item">' +
@@ -1208,7 +1233,6 @@
       '<div class="pie-wrap">' +
         '<div class="donut-holder">' +
           '<div class="pie" style="background:' + gradient + '"></div>' +
-          '<div class="donut-hole"><span class="amt">' + fmt(depensesTotal) + '</span><span class="lbl">dépensé</span></div>' +
         '</div>' +
         '<div class="legend">' + legendHtml + '</div>' +
       '</div>';
@@ -1217,7 +1241,7 @@
   function payerDisplayName(p){ return p === "Elise" ? "Élise" : p; }
 
   function txRowHtml(t){
-    var catList = t.type === "expense" ? EXPENSE_CATEGORIES : INCOME_CATEGORIES;
+    var catList = t.type === "expense" ? ALL_EXPENSE_CATEGORIES : INCOME_CATEGORIES;
     var color = categoryColor(t.category, catList);
     var sign = t.type === "income" ? "+" : "-";
     var payerTag = t.payer ? '<span class="tx-tag tx-tag-' + t.payer.toLowerCase() + '">' + payerDisplayName(t.payer) + '</span>' : "";
@@ -1284,9 +1308,9 @@
 
   function populateFilterCategory(){
     var select = document.getElementById("filterCategory");
-    var all = ["Toutes catégories"].concat(EXPENSE_CATEGORIES, INCOME_CATEGORIES);
+    var all = ["Toutes catégories"].concat(ALL_EXPENSE_CATEGORIES, INCOME_CATEGORIES);
     select.innerHTML = '<option value="">Toutes catégories</option>' +
-      EXPENSE_CATEGORIES.concat(INCOME_CATEGORIES).map(function(c){ return '<option value="' + c + '">' + c + '</option>'; }).join("");
+      ALL_EXPENSE_CATEGORIES.concat(INCOME_CATEGORIES).map(function(c){ return '<option value="' + c + '">' + c + '</option>'; }).join("");
   }
   populateFilterCategory();
 
@@ -1298,6 +1322,7 @@
     filterPayer = this.value;
     renderTransactionsView();
   });
+  document.getElementById("trendPeriod").addEventListener("change", renderTrendChart);
 
   function renderTransactionsView(){
     var list = filteredTx();
@@ -1316,24 +1341,28 @@
   // ---------- Budgets ----------
 
   function renderBudgetsView(){
-    var totals = categoryTotals(filteredTx());
+    var yearList = transactions.filter(function(t){ return t.date.slice(0,4) === currentYear; });
+    var totals = categoryTotals(yearList);
     var container = document.getElementById("budgetsList");
+
+    var cats = EXPENSE_CATEGORIES.slice().sort(function(a,b){ return (totals[b]||0) - (totals[a]||0); });
+
     var html = "";
-    EXPENSE_CATEGORIES.forEach(function(cat){
+    cats.forEach(function(cat){
       var limit = budgets[cat] || "";
-      var spent = totals[cat] || 0;
-      var over = limit && spent > parseFloat(limit);
+      var annualSpent = totals[cat] || 0;
+      var avgMonthly = annualSpent / 12;
+      var over = limit && avgMonthly > parseFloat(limit);
       html += '<div class="budget-row">' +
         '<div class="budget-head">' +
           '<span class="budget-name">' + cat + '</span>' +
           '<input type="number" class="budget-input" min="0" step="1" placeholder="Aucune limite" value="' + limit + '" data-cat="' + cat + '">' +
-        '</div>';
+        '</div>' +
+        '<div class="budget-spent">Total ' + currentYear + ' : <b>' + fmt(annualSpent) + '</b> — Moyenne/mois : <b>' + fmt(avgMonthly) + '</b></div>';
       if(limit){
-        var pct = Math.min((spent / parseFloat(limit)) * 100, 100);
-        html += '<div class="bar-track"><div class="bar-fill" style="width:' + pct + '%;background:' + (over ? "var(--red)" : "linear-gradient(90deg,var(--green),var(--navy))") + '"></div></div>' +
-          '<div class="budget-spent' + (over ? ' over' : '') + '">' + fmt(spent) + ' sur ' + fmt(parseFloat(limit)) + (over ? " — dépassé" : "") + '</div>';
-      } else if(spent > 0){
-        html += '<div class="budget-spent">' + fmt(spent) + ' dépensé, pas de limite définie</div>';
+        var pct = Math.min((avgMonthly / parseFloat(limit)) * 100, 100);
+        html += '<div class="bar-track" style="margin-top:6px;"><div class="bar-fill" style="width:' + pct + '%;background:' + (over ? "var(--red)" : "linear-gradient(90deg,var(--green),var(--navy))") + '"></div></div>' +
+          '<div class="budget-spent' + (over ? ' over' : '') + '" style="margin-top:4px;">Limite mensuelle : ' + fmt(parseFloat(limit)) + (over ? " — moyenne dépassée" : "") + '</div>';
       }
       html += '</div>';
     });
@@ -1359,13 +1388,14 @@
 
   function renderAnalysesView(){
     renderTrendChart();
-    renderPayerBreakdown();
     renderTopCategories();
   }
 
   function renderTrendChart(){
+    var period = parseInt(document.getElementById("trendPeriod").value, 10) || 6;
+    var anchorMonth = new Date().toISOString().slice(0,7);
     var months = [];
-    for(var i=5;i>=0;i--){ months.push(shiftMonth(currentMonth, -i)); }
+    for(var i=period-1; i>=0; i--){ months.push(shiftMonth(anchorMonth, -i)); }
     var data = months.map(function(m){ return computeSummary(txForMonth(m)); });
     var maxVal = Math.max.apply(null, data.map(function(d){ return Math.max(d.revenus, d.depenses); }).concat([1]));
 
@@ -1386,12 +1416,12 @@
     document.getElementById("trendChart").innerHTML = html;
   }
 
-  function renderPayerBreakdown(){
-    var totals = payerTotals(filteredTx());
+  function renderPayerBreakdown(list, containerId){
+    var totals = payerTotals(list);
     var total = totals["Nicolas"] + totals["Elise"] + totals["Aucun"];
-    var container = document.getElementById("payerBreakdown");
+    var container = document.getElementById(containerId);
     if(total <= 0){
-      container.innerHTML = '<p class="empty">Aucune dépense ce mois-ci.</p>';
+      container.innerHTML = '<p class="empty">Aucune dépense sur cette période.</p>';
       return;
     }
     var order = ["Nicolas","Elise","Aucun"];
@@ -1408,11 +1438,12 @@
   }
 
   function renderTopCategories(){
-    var totals = categoryTotals(filteredTx());
-    var active = EXPENSE_CATEGORIES.filter(function(c){ return totals[c] > 0; });
+    var yearList = transactions.filter(function(t){ return t.date.slice(0,4) === currentYear; });
+    var totals = categoryTotals(yearList);
+    var active = ALL_EXPENSE_CATEGORIES.filter(function(c){ return totals[c] > 0; });
     var container = document.getElementById("topCategories");
     if(active.length === 0){
-      container.innerHTML = '<p class="empty">Aucune dépense ce mois-ci.</p>';
+      container.innerHTML = '<p class="empty">Aucune dépense cette année.</p>';
       return;
     }
     active.sort(function(a,b){ return totals[b] - totals[a]; });
@@ -1421,7 +1452,7 @@
     active.forEach(function(cat){
       var val = totals[cat];
       var pct = Math.round((val / maxVal) * 100);
-      var color = categoryColor(cat, EXPENSE_CATEGORIES);
+      var color = categoryColor(cat, ALL_EXPENSE_CATEGORIES);
       html += '<div class="hbar-item">' +
         '<div class="hbar-top"><span class="hbar-name">' + cat + '</span><span class="hbar-val">' + fmt(val) + '</span></div>' +
         '<div class="hbar-track"><div class="hbar-fill" style="width:' + pct + '%;background:' + color + '"></div></div>' +
@@ -1436,7 +1467,7 @@
     var s = computeSummary(list);
     var totals = categoryTotals(list);
     var pTotals = payerTotals(list);
-    var active = EXPENSE_CATEGORIES.filter(function(c){ return totals[c] > 0; }).sort(function(a,b){ return totals[b]-totals[a]; });
+    var active = ALL_EXPENSE_CATEGORIES.filter(function(c){ return totals[c] > 0; }).sort(function(a,b){ return totals[b]-totals[a]; });
 
     var lines = [];
     lines.push("BUDGET PLUS — " + titleLabel);
@@ -1500,6 +1531,75 @@
     navigator.clipboard.writeText(document.getElementById("reportYearly").textContent).then(function(){ showToast("Rapport copié"); });
   });
 
+  function buildPayerDetailReport(list, titleLabel){
+    var order = ["Nicolas","Elise","Aucun"];
+    var lines = [];
+    lines.push("BUDGET PLUS — " + titleLabel);
+    lines.push("Répartition par payeur");
+    lines.push("");
+
+    var grandTotal = 0;
+    order.forEach(function(p){
+      var items = list.filter(function(t){ return t.type === "expense" && t.payer === p; });
+      var subtotal = items.reduce(function(s,t){ return s + t.amount; }, 0);
+      grandTotal += subtotal;
+      lines.push(payerDisplayName(p) + " — " + fmt(subtotal));
+      if(items.length === 0){
+        lines.push("  Aucune dépense.");
+      } else {
+        items.forEach(function(t){
+          lines.push("  " + t.category + " — " + (t.description || "(sans description)") + " — " + fmt(t.amount));
+        });
+      }
+      lines.push("");
+    });
+    lines.push("Total général : " + fmt(grandTotal));
+    return lines.join("\n");
+  }
+
+  document.getElementById("btnGenPayer").addEventListener("click", function(){
+    var text = buildPayerDetailReport(filteredTx(), "Répartition par payeur — " + monthLabelText(currentMonth));
+    var box = document.getElementById("reportPayer");
+    box.textContent = text;
+    box.style.display = "block";
+    document.getElementById("reportPayerActions").style.display = "flex";
+  });
+  document.getElementById("btnDownloadPayer").addEventListener("click", function(){
+    downloadText("budget-plus-payeur-" + currentMonth + ".txt", document.getElementById("reportPayer").textContent);
+  });
+  document.getElementById("btnCopyPayer").addEventListener("click", function(){
+    navigator.clipboard.writeText(document.getElementById("reportPayer").textContent).then(function(){ showToast("Rapport copié"); });
+  });
+
+  function fillPrintCards(labels, values){
+    var container = document.getElementById("printCards");
+    var classes = ["revenus","depenses","solde"];
+    var html = "";
+    labels.forEach(function(lbl, i){
+      var isSoldeCard = (i === 2);
+      var colorStyle = isSoldeCard ? (values[i] >= 0 ? "color:var(--green);" : "color:var(--red);") : "";
+      html += '<div class="card ' + classes[i] + '"><div class="label">' + lbl + '</div><div class="value" style="' + colorStyle + '">' + fmt(values[i]) + '</div></div>';
+    });
+    container.innerHTML = html;
+  }
+
+  function printReport(list, title, cardLabels){
+    var s = computeSummary(list);
+    document.getElementById("printTitle").textContent = title;
+    fillPrintCards(cardLabels, [s.revenus, s.depenses, s.solde]);
+    renderPie("printPieContainer", list, s.depenses);
+    setTimeout(function(){ window.print(); }, 50);
+  }
+
+  document.getElementById("btnPdfMonth").addEventListener("click", function(){
+    printReport(filteredTx(), "Rapport — " + monthLabelText(currentMonth), ["Apport", "Dépenses", "Solde"]);
+  });
+  document.getElementById("btnPdfYear").addEventListener("click", function(){
+    var year = currentMonth.slice(0,4);
+    var yearList = transactions.filter(function(t){ return t.date.slice(0,4) === year; });
+    printReport(yearList, "Rapport annuel — " + year, ["Apport annuel", "Dépenses annuelles", "Épargne annuelle"]);
+  });
+
   // ---------- Formulaire d'ajout / modification ----------
 
   function populateCategorySelect(){
@@ -1555,7 +1655,15 @@
     document.getElementById("toggleIncome").classList.toggle("active", tx.type === "income");
     setPayer(tx.payer || "Nicolas");
     populateCategorySelect();
-    document.getElementById("fCategory").value = tx.category;
+    var catSelect = document.getElementById("fCategory");
+    var hasOption = Array.prototype.some.call(catSelect.options, function(o){ return o.value === tx.category; });
+    if(!hasOption && tx.category){
+      var opt = document.createElement("option");
+      opt.value = tx.category;
+      opt.textContent = tx.category + " (retirée)";
+      catSelect.appendChild(opt);
+    }
+    catSelect.value = tx.category;
     document.getElementById("fDescription").value = tx.description || "";
     document.getElementById("fAmount").value = tx.amount;
     document.getElementById("fDate").value = tx.date;
