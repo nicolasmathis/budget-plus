@@ -1340,10 +1340,21 @@
 
   // ---------- Budgets ----------
 
+  function monthsElapsedInYear(year){
+    var today = new Date();
+    var realYear = today.getFullYear();
+    var realMonth = today.getMonth() + 1;
+    var y = parseInt(year, 10);
+    if(y < realYear) return 12;
+    if(y > realYear) return 0;
+    return realMonth;
+  }
+
   function renderBudgetsView(){
     var yearList = transactions.filter(function(t){ return t.date.slice(0,4) === currentYear; });
     var totals = categoryTotals(yearList);
     var container = document.getElementById("budgetsList");
+    var elapsed = monthsElapsedInYear(currentYear);
 
     var cats = EXPENSE_CATEGORIES.slice().sort(function(a,b){ return (totals[b]||0) - (totals[a]||0); });
 
@@ -1351,18 +1362,21 @@
     cats.forEach(function(cat){
       var limit = budgets[cat] || "";
       var annualSpent = totals[cat] || 0;
-      var avgMonthly = annualSpent / 12;
-      var over = limit && avgMonthly > parseFloat(limit);
+      var avgMonthly = elapsed > 0 ? (annualSpent / elapsed) : 0;
+      var over = limit && elapsed > 0 && avgMonthly > parseFloat(limit);
+      var avgLabel = elapsed > 0 ? fmt(avgMonthly) : "—";
       html += '<div class="budget-row">' +
         '<div class="budget-head">' +
           '<span class="budget-name">' + cat + '</span>' +
           '<input type="number" class="budget-input" min="0" step="1" placeholder="Aucune limite" value="' + limit + '" data-cat="' + cat + '">' +
         '</div>' +
-        '<div class="budget-spent">Total ' + currentYear + ' : <b>' + fmt(annualSpent) + '</b> — Moyenne/mois : <b>' + fmt(avgMonthly) + '</b></div>';
-      if(limit){
+        '<div class="budget-spent">Total ' + currentYear + ' : <b>' + fmt(annualSpent) + '</b> — Moyenne/mois (' + elapsed + ' mois écoulé' + (elapsed > 1 ? "s" : "") + ') : <b>' + avgLabel + '</b></div>';
+      if(limit && elapsed > 0){
         var pct = Math.min((avgMonthly / parseFloat(limit)) * 100, 100);
         html += '<div class="bar-track" style="margin-top:6px;"><div class="bar-fill" style="width:' + pct + '%;background:' + (over ? "var(--red)" : "linear-gradient(90deg,var(--green),var(--navy))") + '"></div></div>' +
           '<div class="budget-spent' + (over ? ' over' : '') + '" style="margin-top:4px;">Limite mensuelle : ' + fmt(parseFloat(limit)) + (over ? " — moyenne dépassée" : "") + '</div>';
+      } else if(limit){
+        html += '<div class="budget-spent" style="margin-top:4px;">Limite mensuelle : ' + fmt(parseFloat(limit)) + ' — aucun mois écoulé sur cette année</div>';
       }
       html += '</div>';
     });
