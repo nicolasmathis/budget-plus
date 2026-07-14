@@ -160,9 +160,31 @@
     font-size:12px;
     gap:6px;
   }
+  .legend-clickable{cursor:pointer;padding:3px 4px;margin:0 -4px;border-radius:6px;}
+  .legend-clickable:hover{background:var(--bg);}
   .legend-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
   .legend-name{flex:1;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .legend-pct{color:var(--muted);font-variant-numeric:tabular-nums;}
+  .filter-badge{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    background:var(--green-soft);
+    color:var(--navy);
+    border-radius:8px;
+    padding:8px 10px;
+    margin-bottom:10px;
+    font-size:12px;
+    font-weight:600;
+  }
+  .filter-badge button{
+    background:none;border:none;color:var(--navy);font-size:14px;cursor:pointer;padding:0 4px;
+  }
+  .group-legend-detail{margin-top:14px;padding-top:12px;border-top:1px solid var(--border);}
+  .group-legend-row{display:flex;align-items:flex-start;gap:8px;font-size:11.5px;color:var(--muted);margin-bottom:8px;line-height:1.5;}
+  .group-legend-row:last-child{margin-bottom:0;}
+  .group-legend-row .legend-dot{margin-top:4px;flex-shrink:0;}
+  .group-legend-row b{color:var(--text);}
   .tx-row{
     display:flex;
     align-items:center;
@@ -642,6 +664,10 @@
             <button class="link-btn" id="toggleExpandRecent" style="display:none;">Afficher tout</button>
             <button class="link-btn" id="goToTransactions">Voir tout</button>
           </div>
+        </div>
+        <div class="filter-badge" id="recentFilterBadge" style="display:none;">
+          <span class="filter-label" id="recentFilterLabel"></span>
+          <button id="clearRecentFilter" aria-label="Retirer le filtre">&#10005;</button>
         </div>
         <div id="recentList"></div>
       </section>
@@ -1161,11 +1187,13 @@
   document.getElementById("prevMonth").addEventListener("click", function(){
     currentMonth = shiftMonth(currentMonth, -1);
     mensuelListExpanded = false;
+    mensuelCategoryFilter = null;
     renderCurrentView();
   });
   document.getElementById("nextMonth").addEventListener("click", function(){
     currentMonth = shiftMonth(currentMonth, 1);
     mensuelListExpanded = false;
+    mensuelCategoryFilter = null;
     renderCurrentView();
   });
 
@@ -1186,7 +1214,10 @@
     document.getElementById("pctLabel").textContent = s.pct + "%";
     document.getElementById("barFill").style.width = Math.min(s.pct,100) + "%";
 
-    renderPie("pieContainer", list, s.depenses);
+    renderPie("pieContainer", list, s.depenses, function(cat){
+      mensuelCategoryFilter = (mensuelCategoryFilter === cat) ? null : cat;
+      renderRecentList(filteredTx());
+    });
     renderRecentList(list);
   }
 
@@ -1231,7 +1262,7 @@
     });
   }
 
-  function renderPie(containerId, list, depensesTotal){
+  function renderPie(containerId, list, depensesTotal, onLegendClick){
     var container = document.getElementById(containerId);
     var totals = categoryTotals(list);
     var active = ALL_EXPENSE_CATEGORIES.filter(function(c){ return totals[c] > 0; });
@@ -1253,10 +1284,10 @@
       var color = categoryColor(cat, ALL_EXPENSE_CATEGORIES);
       gradientParts.push(color + " " + cursor.toFixed(2) + "% " + (cursor+pct).toFixed(2) + "%");
       cursor += pct;
-      legendHtml += '<div class="legend-item">' +
+      legendHtml += '<div class="legend-item' + (onLegendClick ? ' legend-clickable' : '') + '" data-cat="' + cat + '">' +
         '<span class="legend-dot" style="background:' + color + '"></span>' +
         '<span class="legend-name">' + cat + '</span>' +
-        '<span class="legend-pct">' + Math.round(pct) + '%</span>' +
+        '<span class="legend-pct">' + Math.round(pct) + '% — ' + fmt(val) + '</span>' +
         '</div>';
     });
 
@@ -1269,6 +1300,12 @@
         '</div>' +
         '<div class="legend">' + legendHtml + '</div>' +
       '</div>';
+
+    if(onLegendClick){
+      container.querySelectorAll(".legend-item").forEach(function(item){
+        item.addEventListener("click", function(){ onLegendClick(item.getAttribute("data-cat")); });
+      });
+    }
   }
 
   function payerDisplayName(p){ return p === "Elise" ? "Élise" : p; }
@@ -1313,18 +1350,40 @@
   }
 
   var mensuelListExpanded = false;
+  var mensuelCategoryFilter = null;
 
   function renderRecentList(list){
     var container = document.getElementById("recentList");
     var toggleBtn = document.getElementById("toggleExpandRecent");
+    var filterBadge = document.getElementById("recentFilterBadge");
 
-    if(list.length === 0){
-      container.innerHTML = '<p class="empty">Aucune transaction ce mois-ci. Ajoute ta première dépense ou apport.</p>';
+    if(mensuelCategoryFilter){
+      filterBadge.style.display = "flex";
+      document.getElementById("recentFilterLabel").textContent = "Filtré : " + mensuelCategoryFilter;
+    } else {
+      filterBadge.style.display = "none";
+    }
+
+    var workingList = mensuelCategoryFilter
+      ? list.filter(function(t){ return t.type === "expense" && t.category === mensuelCategoryFilter; })
+      : list;
+
+    if(workingList.length === 0){
+      container.innerHTML = '<p class="empty">' +
+        (mensuelCategoryFilter ? "Aucune dépense dans cette catégorie ce mois-ci." : "Aucune transaction ce mois-ci. Ajoute ta première dépense ou apport.") +
+        '</p>';
       toggleBtn.style.display = "none";
       return;
     }
 
-    if(list.length <= 5){
+    if(mensuelCategoryFilter){
+      toggleBtn.style.display = "none";
+      container.innerHTML = workingList.map(txRowHtml).join("");
+      wireTxRows(container);
+      return;
+    }
+
+    if(workingList.length <= 5){
       toggleBtn.style.display = "none";
       mensuelListExpanded = false;
     } else {
@@ -1332,10 +1391,15 @@
       toggleBtn.textContent = mensuelListExpanded ? "Réduire" : "Afficher tout";
     }
 
-    var top = mensuelListExpanded ? list : list.slice(0,5);
+    var top = mensuelListExpanded ? workingList : workingList.slice(0,5);
     container.innerHTML = top.map(txRowHtml).join("");
     wireTxRows(container);
   }
+
+  document.getElementById("clearRecentFilter").addEventListener("click", function(){
+    mensuelCategoryFilter = null;
+    renderRecentList(filteredTx());
+  });
 
   // ---------- Transactions (vue complete avec filtres) ----------
 
@@ -1473,11 +1537,22 @@
     });
 
     var gradient = "conic-gradient(" + gradientParts.join(", ") + ")";
+
+    var detailHtml = '<div class="group-legend-detail">';
+    order.forEach(function(name){
+      var cats = EXPENSE_CATEGORIES.filter(function(c){ return categoryGroup(c) === name; });
+      detailHtml += '<div class="group-legend-row">' +
+        '<span class="legend-dot" style="background:' + GROUP_COLORS[name] + '"></span>' +
+        '<span><b>' + name + '</b> : ' + cats.join(", ") + '</span>' +
+      '</div>';
+    });
+    detailHtml += '</div>';
+
     container.innerHTML =
       '<div class="pie-wrap">' +
         '<div class="donut-holder"><div class="pie" style="background:' + gradient + '"></div></div>' +
         '<div class="legend">' + legendHtml + '</div>' +
-      '</div>';
+      '</div>' + detailHtml;
   }
 
   function renderTrendChart(){
