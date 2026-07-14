@@ -687,6 +687,10 @@
         </div>
       </section>
       <section class="block">
+        <h2>Répartition Fixe / Variable / Plaisir — année affichée</h2>
+        <div id="groupChart"></div>
+      </section>
+      <section class="block">
         <h2>Top catégories — année affichée</h2>
         <div id="topCategories"></div>
       </section>
@@ -922,6 +926,35 @@
   ];
 
   var PAYER_COLORS = { "Nicolas":"#3E92CC", "Elise":"#D66BA0", "Aucun":"#6B7A8F" };
+
+  var CATEGORY_GROUP_MAP = {
+    "Logement & Charges":"Fixe",
+    "Frais bancaires":"Fixe",
+    "Impôts":"Fixe",
+    "Nourritures":"Variable",
+    "Dépenses Voiture":"Variable",
+    "Soins Médicaux":"Variable",
+    "Sport":"Variable",
+    "Développement personnel":"Variable",
+    "Ameublement":"Variable",
+    "Transports":"Variable",
+    "Électroniques":"Variable",
+    "Immigration":"Variable",
+    "Autres":"Variable",
+    "Divertissements":"Plaisir",
+    "Restaurants":"Plaisir",
+    "Vacances / Week End":"Plaisir",
+    "Cadeaux":"Plaisir",
+    "Téléphone portable":"Fixe",
+    "Coiffeur":"Plaisir",
+    "LifeStyle":"Plaisir",
+    "Investissements":"Fixe"
+  };
+  var GROUP_COLORS = { "Fixe":"#14213D", "Variable":"#F2B134", "Plaisir":"#8E7CC3" };
+
+  function categoryGroup(cat){
+    return CATEGORY_GROUP_MAP[cat] || "Variable";
+  }
 
   var STORAGE_KEY = "budgetplus_transactions_v1";
   var BUDGETS_KEY = "budgetplus_budgets_v1";
@@ -1402,7 +1435,49 @@
 
   function renderAnalysesView(){
     renderTrendChart();
+    renderGroupChart();
     renderTopCategories();
+  }
+
+  function renderGroupChart(){
+    var yearList = transactions.filter(function(t){ return t.date.slice(0,4) === currentYear && t.type === "expense"; });
+    var totals = { "Fixe":0, "Variable":0, "Plaisir":0 };
+    yearList.forEach(function(t){
+      var g = categoryGroup(t.category);
+      totals[g] = (totals[g] || 0) + t.amount;
+    });
+    var total = totals["Fixe"] + totals["Variable"] + totals["Plaisir"];
+    var container = document.getElementById("groupChart");
+
+    if(total <= 0){
+      container.innerHTML = '<p class="empty">Aucune dépense cette année.</p>';
+      return;
+    }
+
+    var order = ["Fixe","Variable","Plaisir"];
+    var cursor = 0;
+    var gradientParts = [];
+    var legendHtml = "";
+    order.forEach(function(name){
+      var val = totals[name];
+      if(val <= 0) return;
+      var pct = (val / total) * 100;
+      var color = GROUP_COLORS[name];
+      gradientParts.push(color + " " + cursor.toFixed(2) + "% " + (cursor+pct).toFixed(2) + "%");
+      cursor += pct;
+      legendHtml += '<div class="legend-item">' +
+        '<span class="legend-dot" style="background:' + color + '"></span>' +
+        '<span class="legend-name">' + name + '</span>' +
+        '<span class="legend-pct">' + Math.round(pct) + '% — ' + fmt(val) + '</span>' +
+        '</div>';
+    });
+
+    var gradient = "conic-gradient(" + gradientParts.join(", ") + ")";
+    container.innerHTML =
+      '<div class="pie-wrap">' +
+        '<div class="donut-holder"><div class="pie" style="background:' + gradient + '"></div></div>' +
+        '<div class="legend">' + legendHtml + '</div>' +
+      '</div>';
   }
 
   function renderTrendChart(){
