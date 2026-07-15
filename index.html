@@ -973,16 +973,16 @@
 (function(){
 
   var EXPENSE_CATEGORIES = [
-    "Nourritures","Dépenses Voiture","Soins Médicaux","Divertissements",
+    "Nourriture","Voiture","Soins Médicaux","Divertissements",
     "Restaurants","Vacances / Week End","Cadeaux","Sport","Frais bancaires",
-    "Développement personnel","Logement","Ameublement","Transports",
-    "Électroniques","Impôts","Immigration","Abonnements","Assurances","Autres"
+    "Développement personnel","Logement","Ameublement","Transport",
+    "Électronique","Impôts","Immigration","Abonnements","Assurances","Autre"
   ];
 
   var LEGACY_EXPENSE_CATEGORIES = ["Téléphone portable","Coiffeur","LifeStyle","Investissements"];
   var ALL_EXPENSE_CATEGORIES = EXPENSE_CATEGORIES.concat(LEGACY_EXPENSE_CATEGORIES);
 
-  var INCOME_CATEGORIES = ["Apport","Sous-location","Impôts","Autre"];
+  var INCOME_CATEGORIES = ["Apports","Sous-location","Impôts","Autre"];
 
   var CATEGORY_RENAME_MAP = {
     "Telephone portable":"Téléphone portable",
@@ -992,7 +992,13 @@
     "Electroniques":"Électroniques",
     "Impots":"Impôts",
     "Salaire":"Apport",
-    "Logement & Charges":"Logement"
+    "Logement & Charges":"Logement",
+    "Apport":"Apports",
+    "Autres":"Autre",
+    "Nourritures":"Nourriture",
+    "Dépenses Voiture":"Voiture",
+    "Transports":"Transport",
+    "Électroniques":"Électronique"
   };
 
   var CATEGORY_COLORS = [
@@ -1009,16 +1015,16 @@
     "Impôts":"Fixe",
     "Abonnements":"Fixe",
     "Assurances":"Fixe",
-    "Nourritures":"Variable",
-    "Dépenses Voiture":"Variable",
+    "Nourriture":"Variable",
+    "Voiture":"Variable",
     "Soins Médicaux":"Variable",
     "Sport":"Variable",
     "Développement personnel":"Variable",
     "Ameublement":"Variable",
-    "Transports":"Variable",
-    "Électroniques":"Variable",
+    "Transport":"Variable",
+    "Électronique":"Variable",
     "Immigration":"Variable",
-    "Autres":"Variable",
+    "Autre":"Variable",
     "Divertissements":"Plaisir",
     "Restaurants":"Plaisir",
     "Vacances / Week End":"Plaisir",
@@ -1085,7 +1091,9 @@
   function migrateCategoryAccents(){
     var changed = false;
     transactions.forEach(function(t){
-      if(CATEGORY_RENAME_MAP[t.category]){
+      var seen = {};
+      while(CATEGORY_RENAME_MAP[t.category] && !seen[t.category]){
+        seen[t.category] = true;
         t.category = CATEGORY_RENAME_MAP[t.category];
         changed = true;
       }
