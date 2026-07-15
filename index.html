@@ -542,6 +542,14 @@
   }
 
   #printArea{display:none;}
+  #printArea .print-legend-item{display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:6px;}
+  #printArea .print-legend-item svg{flex-shrink:0;}
+  #printArea .print-legend-name{flex:1;color:var(--text);}
+  #printArea .print-legend-pct{color:var(--muted);font-variant-numeric:tabular-nums;}
+  #printArea .print-table{width:100%;border-collapse:collapse;font-size:11px;}
+  #printArea .print-table th, #printArea .print-table td{padding:6px 8px;border-bottom:1px solid var(--border);text-align:left;}
+  #printArea .print-table th{color:var(--muted);font-weight:600;font-size:10px;text-transform:uppercase;}
+  #printArea .print-table td.num, #printArea .print-table th.num{text-align:right;}
 
   @media print{
     body *{visibility:hidden;}
@@ -556,7 +564,6 @@
     }
     #printArea .cards{grid-template-columns:repeat(3,1fr);}
     #printArea .card{box-shadow:none;border:1px solid var(--border);}
-    #printArea .pie{box-shadow:none;}
   }
 </style>
 </head>
@@ -916,6 +923,16 @@
     <div class="cards" id="printCards" style="margin-top:0;grid-template-columns:repeat(3,1fr);"></div>
     <h2 style="font-size:15px;margin:20px 0 10px;">Répartition des dépenses</h2>
     <div id="printPieContainer"></div>
+
+    <div id="printTxSection" style="margin-top:24px;">
+      <h2 style="font-size:15px;margin:0 0 10px;">Détail des transactions</h2>
+      <div id="printTxList"></div>
+    </div>
+
+    <div id="printMonthsSection" style="margin-top:24px;display:none;">
+      <h2 style="font-size:15px;margin:0 0 10px;">Détail par mois</h2>
+      <div id="printMonthsList"></div>
+    </div>
   </div>
 
 </div>
@@ -926,7 +943,7 @@
   var EXPENSE_CATEGORIES = [
     "Nourritures","Dépenses Voiture","Soins Médicaux","Divertissements",
     "Restaurants","Vacances / Week End","Cadeaux","Sport","Frais bancaires",
-    "Développement personnel","Logement & Charges","Ameublement","Transports",
+    "Développement personnel","Logement","Ameublement","Transports",
     "Électroniques","Impôts","Immigration","Abonnements","Assurances","Autres"
   ];
 
@@ -942,7 +959,8 @@
     "Developpement personnel":"Développement personnel",
     "Electroniques":"Électroniques",
     "Impots":"Impôts",
-    "Salaire":"Apport"
+    "Salaire":"Apport",
+    "Logement & Charges":"Logement"
   };
 
   var CATEGORY_COLORS = [
@@ -954,7 +972,7 @@
   var PAYER_COLORS = { "Nicolas":"#3E92CC", "Elise":"#D66BA0", "Aucun":"#6B7A8F" };
 
   var CATEGORY_GROUP_MAP = {
-    "Logement & Charges":"Fixe",
+    "Logement":"Fixe",
     "Frais bancaires":"Fixe",
     "Impôts":"Fixe",
     "Abonnements":"Fixe",
@@ -1749,21 +1767,124 @@
     container.innerHTML = html;
   }
 
-  function printReport(list, title, cardLabels){
+  function polarToCartesian(cx, cy, r, angleDeg){
+    var rad = (angleDeg - 90) * Math.PI / 180;
+    return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+  }
+
+  function describeSlice(cx, cy, r, startAngle, endAngle){
+    var start = polarToCartesian(cx, cy, r, endAngle);
+    var end = polarToCartesian(cx, cy, r, startAngle);
+    var largeArc = (endAngle - startAngle) <= 180 ? "0" : "1";
+    return ["M", cx, cy, "L", start.x, start.y, "A", r, r, 0, largeArc, 0, end.x, end.y, "Z"].join(" ");
+  }
+
+  function buildPrintPie(list, depensesTotal){
+    var totals = categoryTotals(list);
+    var active = ALL_EXPENSE_CATEGORIES.filter(function(c){ return totals[c] > 0; });
+
+    if(active.length === 0 || depensesTotal <= 0){
+      return '<p class="empty">Aucune dépense enregistrée sur cette période.</p>';
+    }
+
+    active.sort(function(a,b){ return totals[b] - totals[a]; });
+
+    var size = 180, r = 80, cx = size/2, cy = size/2;
+    var svgParts = [];
+    var legendHtml = "";
+
+    if(active.length === 1){
+      var onlyColor = categoryColor(active[0], ALL_EXPENSE_CATEGORIES);
+      svgParts.push('<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="' + onlyColor + '"></circle>');
+    } else {
+      var cursorAngle = 0;
+      active.forEach(function(cat){
+        var pct = (totals[cat] / depensesTotal) * 100;
+        var angle = (pct / 100) * 360;
+        var color = categoryColor(cat, ALL_EXPENSE_CATEGORIES);
+        svgParts.push('<path d="' + describeSlice(cx, cy, r, cursorAngle, cursorAngle + angle) + '" fill="' + color + '"></path>');
+        cursorAngle += angle;
+      });
+    }
+
+    active.forEach(function(cat){
+      var val = totals[cat];
+      var pct = (val / depensesTotal) * 100;
+      var color = categoryColor(cat, ALL_EXPENSE_CATEGORIES);
+      legendHtml += '<div class="print-legend-item">' +
+        '<svg width="10" height="10"><rect width="10" height="10" fill="' + color + '"></rect></svg>' +
+        '<span class="print-legend-name">' + cat + '</span>' +
+        '<span class="print-legend-pct">' + Math.round(pct) + '% — ' + fmt(val) + '</span>' +
+        '</div>';
+    });
+
+    var svg = '<svg viewBox="0 0 ' + size + ' ' + size + '" width="' + size + '" height="' + size + '">' + svgParts.join('') + '</svg>';
+
+    return '<div class="pie-wrap"><div class="donut-holder">' + svg + '</div><div class="legend">' + legendHtml + '</div></div>';
+  }
+
+  function buildPrintTxTable(list){
+    var sorted = list.slice().sort(function(a,b){ return b.date.localeCompare(a.date); });
+    if(sorted.length === 0) return '<p class="empty">Aucune transaction sur cette période.</p>';
+    var rows = sorted.map(function(t){
+      var sign = t.type === "income" ? "+" : "-";
+      var color = t.type === "income" ? "var(--green)" : "var(--red)";
+      return '<tr>' +
+        '<td>' + t.date + '</td>' +
+        '<td>' + t.category + '</td>' +
+        '<td>' + (t.description || "") + '</td>' +
+        '<td>' + (t.payer ? payerDisplayName(t.payer) : "") + '</td>' +
+        '<td class="num" style="color:' + color + ';">' + sign + fmt(t.amount) + '</td>' +
+      '</tr>';
+    }).join("");
+    return '<table class="print-table"><thead><tr><th>Date</th><th>Catégorie</th><th>Description</th><th>Payeur</th><th class="num">Montant</th></tr></thead><tbody>' + rows + '</tbody></table>';
+  }
+
+  function buildPrintMonthsTable(year){
+    var rows = "";
+    for(var m=1; m<=12; m++){
+      var ym = year + "-" + pad(m);
+      var list = txForMonth(ym);
+      var ms = computeSummary(list);
+      var pctSaved = ms.revenus > 0 ? Math.round((ms.solde / ms.revenus) * 100) : (ms.solde !== 0 ? (ms.solde > 0 ? 100 : -100) : 0);
+      var color = ms.solde >= 0 ? "var(--green)" : "var(--red)";
+      rows += '<tr>' +
+        '<td style="text-transform:capitalize;">' + monthLabelText(ym) + '</td>' +
+        '<td class="num">' + fmt(ms.revenus) + '</td>' +
+        '<td class="num">' + fmt(ms.depenses) + '</td>' +
+        '<td class="num" style="color:' + color + ';">' + fmt(ms.solde) + '</td>' +
+        '<td class="num">' + pctSaved + '%</td>' +
+      '</tr>';
+    }
+    return '<table class="print-table"><thead><tr><th>Mois</th><th class="num">Apport</th><th class="num">Dépenses</th><th class="num">Épargne</th><th class="num">% économisé</th></tr></thead><tbody>' + rows + '</tbody></table>';
+  }
+
+  function printReport(list, title, cardLabels, type, year){
     var s = computeSummary(list);
     document.getElementById("printTitle").textContent = title;
     fillPrintCards(cardLabels, [s.revenus, s.depenses, s.solde]);
-    renderPie("printPieContainer", list, s.depenses);
+    document.getElementById("printPieContainer").innerHTML = buildPrintPie(list, s.depenses);
+
+    if(type === "month"){
+      document.getElementById("printTxSection").style.display = "block";
+      document.getElementById("printMonthsSection").style.display = "none";
+      document.getElementById("printTxList").innerHTML = buildPrintTxTable(list);
+    } else {
+      document.getElementById("printTxSection").style.display = "none";
+      document.getElementById("printMonthsSection").style.display = "block";
+      document.getElementById("printMonthsList").innerHTML = buildPrintMonthsTable(year);
+    }
+
     setTimeout(function(){ window.print(); }, 50);
   }
 
   document.getElementById("btnPdfMonth").addEventListener("click", function(){
-    printReport(filteredTx(), "Rapport — " + monthLabelText(currentMonth), ["Apport", "Dépenses", "Solde"]);
+    printReport(filteredTx(), "Rapport — " + monthLabelText(currentMonth), ["Apport", "Dépenses", "Solde"], "month");
   });
   document.getElementById("btnPdfYear").addEventListener("click", function(){
     var year = currentMonth.slice(0,4);
     var yearList = transactions.filter(function(t){ return t.date.slice(0,4) === year; });
-    printReport(yearList, "Rapport annuel — " + year, ["Apport annuel", "Dépenses annuelles", "Épargne annuelle"]);
+    printReport(yearList, "Rapport annuel — " + year, ["Apport annuel", "Dépenses annuelles", "Épargne annuelle"], "year", year);
   });
 
   // ---------- Formulaire d'ajout / modification ----------
