@@ -2289,8 +2289,9 @@
   }
 
   function githubGetFile(cfg){
-    var url = "https://api.github.com/repos/" + cfg.owner + "/" + cfg.repo + "/contents/" + DATA_PATH;
+    var url = "https://api.github.com/repos/" + cfg.owner + "/" + cfg.repo + "/contents/" + DATA_PATH + "?_=" + Date.now();
     return fetch(url, {
+      cache: "no-store",
       headers: { "Authorization":"Bearer " + cfg.token, "Accept":"application/vnd.github+json" }
     }).then(function(res){
       if(res.status === 404) return null;
