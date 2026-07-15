@@ -136,8 +136,9 @@
   }
   .pie-wrap{
     display:flex;
+    flex-direction:column;
     align-items:center;
-    gap:18px;
+    gap:16px;
   }
   .donut-holder{position:relative;width:170px;height:170px;flex-shrink:0;}
   .pie{
@@ -147,24 +148,25 @@
     box-shadow:0 4px 14px rgba(20,33,61,0.12);
   }
   .legend{
-    flex:1;
+    width:100%;
     display:flex;
     flex-direction:column;
-    gap:6px;
-    max-height:160px;
-    overflow-y:auto;
+    gap:10px;
   }
   .legend-item{
     display:flex;
     align-items:center;
-    font-size:12px;
-    gap:6px;
+    font-size:13px;
+    gap:8px;
+    padding:6px 4px;
+    border-bottom:1px solid var(--border);
   }
-  .legend-clickable{cursor:pointer;padding:3px 4px;margin:0 -4px;border-radius:6px;}
+  .legend-item:last-child{border-bottom:none;}
+  .legend-clickable{cursor:pointer;border-radius:6px;}
   .legend-clickable:hover{background:var(--bg);}
-  .legend-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
-  .legend-name{flex:1;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .legend-pct{color:var(--muted);font-variant-numeric:tabular-nums;}
+  .legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+  .legend-name{flex:1;color:var(--text);font-weight:600;white-space:normal;overflow-wrap:break-word;}
+  .legend-pct{color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap;flex-shrink:0;}
   .filter-badge{
     display:flex;
     align-items:center;
@@ -539,6 +541,10 @@
     .bottom-nav{display:none;}
     .fab{display:flex;left:auto;right:24px;transform:none;max-width:none;}
     .fab button{padding:13px 22px;}
+    .pie-wrap{flex-direction:row;align-items:center;gap:20px;}
+    .legend{max-height:220px;overflow-y:auto;}
+    .legend-item{font-size:12px;padding:4px 4px;}
+    .legend-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   }
 
   #printArea{display:none;}
@@ -1005,6 +1011,7 @@
 
   var STORAGE_KEY = "budgetplus_transactions_v1";
   var BUDGETS_KEY = "budgetplus_budgets_v1";
+  var TOMBSTONES_KEY = "budgetplus_tombstones_v1";
 
   function loadTransactions(){
     try{
@@ -1016,6 +1023,18 @@
   }
   function saveTransactions(list){
     localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  }
+
+  function loadTombstones(){
+    try{
+      var raw = localStorage.getItem(TOMBSTONES_KEY);
+      return raw ? JSON.parse(raw) : {};
+    }catch(e){
+      return {};
+    }
+  }
+  function saveTombstones(obj){
+    localStorage.setItem(TOMBSTONES_KEY, JSON.stringify(obj));
   }
 
   function loadBudgets(){
@@ -1032,6 +1051,7 @@
 
   var transactions = loadTransactions();
   var budgets = loadBudgets();
+  var tombstones = loadTombstones();
 
   function migrateCategoryAccents(){
     var changed = false;
@@ -1045,6 +1065,15 @@
     return changed;
   }
   migrateCategoryAccents();
+
+  function migrateUpdatedAt(){
+    var changed = false;
+    transactions.forEach(function(t){
+      if(!t.updatedAt){ t.updatedAt = Date.now(); changed = true; }
+    });
+    if(changed) saveTransactions(transactions);
+  }
+  migrateUpdatedAt();
 
   var currentMonth = new Date().toISOString().slice(0,7);
   var currentYear = new Date().getFullYear().toString();
@@ -1362,6 +1391,8 @@
         if(confirm("Supprimer cette transaction ?")){
           transactions = transactions.filter(function(t){ return t.id !== id; });
           saveTransactions(transactions);
+          tombstones[id] = Date.now();
+          saveTombstones(tombstones);
           renderCurrentView();
           showToast("Transaction supprimée");
           pushRemoteIfConfigured();
@@ -2011,6 +2042,7 @@
         existing.amount = amount;
         existing.date = date;
         existing.payer = currentPayer;
+        existing.updatedAt = Date.now();
       }
     } else {
       transactions.push({
@@ -2020,7 +2052,8 @@
         description: description,
         amount: amount,
         date: date,
-        payer: currentPayer
+        payer: currentPayer,
+        updatedAt: Date.now()
       });
     }
 
@@ -2123,7 +2156,8 @@
         description: original.description,
         amount: original.amount,
         date: dateShiftedToMonth(original.date, currentMonth),
-        payer: original.payer
+        payer: original.payer,
+        updatedAt: Date.now()
       });
       count++;
     });
@@ -2164,6 +2198,7 @@
         var data = JSON.parse(evt.target.result);
         var importedTx = Array.isArray(data) ? data : (data.transactions || []);
         var importedBudgets = Array.isArray(data) ? {} : (data.budgets || {});
+        importedTx.forEach(function(t){ if(!t.updatedAt) t.updatedAt = Date.now(); });
 
         var mode = confirm("Remplacer toutes les données actuelles par ce fichier ? Annuler pour fusionner avec les données existantes.");
         if(mode){
@@ -2290,22 +2325,52 @@
   }
 
   function mergeRemoteData(remoteData){
-    var remoteTx, remoteBudgets;
+    var remoteTx, remoteBudgets, remoteTombstones;
     if(Array.isArray(remoteData)){
       remoteTx = remoteData;
       remoteBudgets = {};
+      remoteTombstones = {};
     } else {
       remoteTx = remoteData.transactions || [];
       remoteBudgets = remoteData.budgets || {};
+      remoteTombstones = remoteData.tombstones || {};
     }
 
-    var localIds = {};
-    transactions.forEach(function(t){ localIds[t.id] = true; });
-    var added = 0;
-    remoteTx.forEach(function(t){
-      if(!localIds[t.id]){ transactions.push(t); added++; }
+    // Fusionner les suppressions: on garde la date de suppression la plus recente connue
+    Object.keys(remoteTombstones).forEach(function(id){
+      if(!tombstones[id] || remoteTombstones[id] > tombstones[id]){
+        tombstones[id] = remoteTombstones[id];
+      }
     });
-    if(added > 0) saveTransactions(transactions);
+    saveTombstones(tombstones);
+
+    // Fusionner les transactions: par id, on garde la version la plus recemment modifiee (updatedAt)
+    var localById = {};
+    transactions.forEach(function(t){ localById[t.id] = t; });
+
+    remoteTx.forEach(function(t){
+      var existing = localById[t.id];
+      if(!existing){
+        localById[t.id] = t;
+      } else {
+        var localTime = existing.updatedAt || 0;
+        var remoteTime = t.updatedAt || 0;
+        if(remoteTime > localTime){
+          localById[t.id] = t;
+        }
+      }
+    });
+
+    // Retirer tout ce qui a ete supprime quelque part (la suppression l'emporte)
+    var merged = [];
+    Object.keys(localById).forEach(function(id){
+      if(!tombstones[id]){
+        merged.push(localById[id]);
+      }
+    });
+
+    transactions = merged;
+    saveTransactions(transactions);
 
     budgets = Object.assign({}, budgets, remoteBudgets);
     saveBudgets(budgets);
@@ -2350,7 +2415,7 @@
     var cfg = loadSyncConfig();
     if(!cfg) return Promise.resolve();
     var sha = localStorage.getItem(SYNC_SHA_KEY) || null;
-    return encryptData({ transactions:transactions, budgets:budgets }, cfg.passphrase).then(function(payload){
+    return encryptData({ transactions:transactions, budgets:budgets, tombstones:tombstones }, cfg.passphrase).then(function(payload){
       return githubPutFile(cfg, payload, sha).then(function(newSha){
         localStorage.setItem(SYNC_SHA_KEY, newSha);
       });
@@ -2364,6 +2429,17 @@
       renderCurrentView();
       setSyncStatus("ok", "À jour, " + new Date().toLocaleTimeString("fr-FR", {hour:"2-digit", minute:"2-digit"}));
     }).catch(function(err){
+      // Si un autre appareil a synchronise entre notre pull et notre push, on retente une fois
+      if(err && err.message && err.message.indexOf("(409)") !== -1){
+        return pullAndMerge().then(function(){
+          return pushRemote();
+        }).then(function(){
+          renderCurrentView();
+          setSyncStatus("ok", "À jour, " + new Date().toLocaleTimeString("fr-FR", {hour:"2-digit", minute:"2-digit"}));
+        }).catch(function(err2){
+          setSyncStatus("error", "Erreur: " + err2.message);
+        });
+      }
       setSyncStatus("error", "Erreur: " + err.message);
     });
   }
@@ -2371,12 +2447,7 @@
   function pushRemoteIfConfigured(){
     var cfg = loadSyncConfig();
     if(!cfg) return;
-    setSyncStatus("pending", "Synchronisation en cours...");
-    pushRemote().then(function(){
-      setSyncStatus("ok", "À jour, " + new Date().toLocaleTimeString("fr-FR", {hour:"2-digit", minute:"2-digit"}));
-    }).catch(function(err){
-      setSyncStatus("error", "Erreur: " + err.message);
-    });
+    fullSync();
   }
 
   var syncOverlay = document.getElementById("syncOverlay");
