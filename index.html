@@ -1771,7 +1771,8 @@
   function populateCategorySelect(){
     var select = document.getElementById("fCategory");
     var cats = currentType === "expense" ? EXPENSE_CATEGORIES : INCOME_CATEGORIES;
-    select.innerHTML = cats.map(function(c){ return '<option value="' + c + '">' + c + '</option>'; }).join("");
+    var sorted = cats.slice().sort(function(a,b){ return a.localeCompare(b, "fr"); });
+    select.innerHTML = sorted.map(function(c){ return '<option value="' + c + '">' + c + '</option>'; }).join("");
   }
 
   function showToast(msg){
