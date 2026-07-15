@@ -868,6 +868,15 @@
         <label for="fCategory">Catégorie</label>
         <select id="fCategory"></select>
       </div>
+      <div class="field" id="groupOverrideField">
+        <label for="fGroupOverride">Classification (optionnel)</label>
+        <select id="fGroupOverride">
+          <option value="">Automatique (selon la catégorie)</option>
+          <option value="Fixe">Fixe</option>
+          <option value="Variable">Variable</option>
+          <option value="Plaisir">Plaisir</option>
+        </select>
+      </div>
       <div class="field">
         <label for="fDescription">Description</label>
         <input type="text" id="fDescription" placeholder="Ex: Supermarche, Loyer...">
@@ -1023,6 +1032,10 @@
 
   function categoryGroup(cat){
     return CATEGORY_GROUP_MAP[cat] || "Variable";
+  }
+
+  function transactionGroup(t){
+    return t.groupOverride || categoryGroup(t.category);
   }
 
   var STORAGE_KEY = "budgetplus_transactions_v1";
@@ -1586,7 +1599,7 @@
     var yearList = transactions.filter(function(t){ return t.date.slice(0,4) === currentYear && t.type === "expense"; });
     var totals = { "Fixe":0, "Variable":0, "Plaisir":0 };
     yearList.forEach(function(t){
-      var g = categoryGroup(t.category);
+      var g = transactionGroup(t);
       totals[g] = (totals[g] || 0) + t.amount;
     });
     var total = totals["Fixe"] + totals["Variable"] + totals["Plaisir"];
@@ -1974,6 +1987,10 @@
     document.getElementById("togglePayerAucun").classList.toggle("active", payer === "Aucun");
   }
 
+  function updateGroupOverrideVisibility(){
+    document.getElementById("groupOverrideField").style.display = currentType === "expense" ? "block" : "none";
+  }
+
   function openSheet(){
     editingId = null;
     document.getElementById("sheetTitle").textContent = "Ajouter une transaction";
@@ -1983,6 +2000,8 @@
     document.getElementById("toggleIncome").classList.remove("active");
     setPayer("Nicolas");
     populateCategorySelect();
+    document.getElementById("fGroupOverride").value = "";
+    updateGroupOverrideVisibility();
     document.getElementById("fDescription").value = "";
     document.getElementById("fAmount").value = "";
     var today = new Date();
@@ -2013,6 +2032,8 @@
       catSelect.appendChild(opt);
     }
     catSelect.value = tx.category;
+    document.getElementById("fGroupOverride").value = tx.groupOverride || "";
+    updateGroupOverrideVisibility();
     document.getElementById("fDescription").value = tx.description || "";
     document.getElementById("fAmount").value = tx.amount;
     document.getElementById("fDate").value = tx.date;
@@ -2035,12 +2056,14 @@
     this.classList.add("active");
     document.getElementById("toggleIncome").classList.remove("active");
     populateCategorySelect();
+    updateGroupOverrideVisibility();
   });
   document.getElementById("toggleIncome").addEventListener("click", function(){
     currentType = "income";
     this.classList.add("active");
     document.getElementById("toggleExpense").classList.remove("active");
     populateCategorySelect();
+    updateGroupOverrideVisibility();
   });
   document.getElementById("togglePayerNicolas").addEventListener("click", function(){ setPayer("Nicolas"); });
   document.getElementById("togglePayerElise").addEventListener("click", function(){ setPayer("Elise"); });
@@ -2048,6 +2071,7 @@
 
   document.getElementById("btnSave").addEventListener("click", function(){
     var category = document.getElementById("fCategory").value;
+    var groupOverride = currentType === "expense" ? document.getElementById("fGroupOverride").value : "";
     var description = document.getElementById("fDescription").value.trim();
     var amountRaw = document.getElementById("fAmount").value;
     var date = document.getElementById("fDate").value;
@@ -2067,6 +2091,7 @@
       if(existing){
         existing.type = currentType;
         existing.category = category;
+        if(groupOverride){ existing.groupOverride = groupOverride; } else { delete existing.groupOverride; }
         existing.description = description;
         existing.amount = amount;
         existing.date = date;
@@ -2074,7 +2099,7 @@
         existing.updatedAt = Date.now();
       }
     } else {
-      transactions.push({
+      var newTx = {
         id: Date.now().toString(36) + Math.random().toString(36).slice(2,8),
         type: currentType,
         category: category,
@@ -2083,7 +2108,9 @@
         date: date,
         payer: currentPayer,
         updatedAt: Date.now()
-      });
+      };
+      if(groupOverride){ newTx.groupOverride = groupOverride; }
+      transactions.push(newTx);
     }
 
     saveTransactions(transactions);
