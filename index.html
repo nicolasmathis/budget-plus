@@ -2422,25 +2422,45 @@
     });
   }
 
-  function fullSync(){
+  var syncInProgress = false;
+  var syncQueued = false;
+
+  function runSyncOnce(){
     return pullAndMerge().then(function(){
       return pushRemote();
-    }).then(function(){
+    });
+  }
+
+  function fullSync(){
+    if(syncInProgress){
+      syncQueued = true;
+      return Promise.resolve();
+    }
+    syncInProgress = true;
+    setSyncStatus("pending", "Synchronisation en cours...");
+
+    function attempt(retriesLeft){
+      return runSyncOnce().catch(function(err){
+        var isConflict = err && err.message && err.message.indexOf("(409)") !== -1;
+        if(retriesLeft > 0 && isConflict){
+          return new Promise(function(resolve){ setTimeout(resolve, 400 + Math.random()*500); })
+            .then(function(){ return attempt(retriesLeft - 1); });
+        }
+        throw err;
+      });
+    }
+
+    return attempt(2).then(function(){
       renderCurrentView();
       setSyncStatus("ok", "À jour, " + new Date().toLocaleTimeString("fr-FR", {hour:"2-digit", minute:"2-digit"}));
     }).catch(function(err){
-      // Si un autre appareil a synchronise entre notre pull et notre push, on retente une fois
-      if(err && err.message && err.message.indexOf("(409)") !== -1){
-        return pullAndMerge().then(function(){
-          return pushRemote();
-        }).then(function(){
-          renderCurrentView();
-          setSyncStatus("ok", "À jour, " + new Date().toLocaleTimeString("fr-FR", {hour:"2-digit", minute:"2-digit"}));
-        }).catch(function(err2){
-          setSyncStatus("error", "Erreur: " + err2.message);
-        });
-      }
       setSyncStatus("error", "Erreur: " + err.message);
+    }).then(function(){
+      syncInProgress = false;
+      if(syncQueued){
+        syncQueued = false;
+        fullSync();
+      }
     });
   }
 
