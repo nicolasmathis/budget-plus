@@ -800,6 +800,22 @@
         <input type="file" id="importFile" accept="application/json">
         <p class="note">Tes données restent sur cet appareil. Si tu actives la synchronisation, elles sont aussi chiffrées puis envoyées vers ton propre repository GitHub privé, illisible sans ton mot de passe de chiffrement. Exporte régulièrement pour garder une copie de secours.</p>
       </section>
+
+      <section class="block settings-block">
+        <h2>Restaurer une version antérieure</h2>
+        <p class="note" style="margin-top:-6px;margin-bottom:10px;">En cas de synchronisation qui a écrasé de bonnes données par erreur. Va sur GitHub, dans ton repository de données, ouvre data.json, clique sur "History", trouve la version d'avant le problème, copie le SHA du commit et colle le ici.</p>
+        <div class="field">
+          <label for="sRestoreSha">SHA du commit</label>
+          <input type="text" id="sRestoreSha" placeholder="Ex: a1b2c3d4..." autocapitalize="off" autocorrect="off">
+        </div>
+        <div class="settings-row">
+          <button id="btnPreviewRestore">Aperçu</button>
+        </div>
+        <div id="restorePreview" style="display:none;margin-top:10px;font-size:12.5px;color:var(--text);background:var(--bg);border-radius:10px;padding:12px;"></div>
+        <div class="settings-row" id="restoreApplyRow" style="display:none;margin-top:10px;">
+          <button id="btnApplyRestore" style="background:var(--red);color:#fff;border-color:var(--red);">Charger cette version</button>
+        </div>
+      </section>
     </section>
 
   </main>
@@ -1069,7 +1085,10 @@
   function migrateUpdatedAt(){
     var changed = false;
     transactions.forEach(function(t){
-      if(!t.updatedAt){ t.updatedAt = Date.now(); changed = true; }
+      // Valeur fixe et neutre: une transaction migree ne doit jamais sembler
+      // plus recente qu'une autre juste parce que cet appareil a ouvert
+      // l'app mise a jour un peu plus tard qu'un autre.
+      if(!t.updatedAt){ t.updatedAt = 1; changed = true; }
     });
     if(changed) saveTransactions(transactions);
   }
@@ -2202,6 +2221,9 @@
 
         var mode = confirm("Remplacer toutes les données actuelles par ce fichier ? Annuler pour fusionner avec les données existantes.");
         if(mode){
+          // Remplacement complet: ces donnees deviennent la reference,
+          // elles doivent gagner face a tout ce qui existe ailleurs.
+          importedTx.forEach(function(t){ t.updatedAt = Date.now(); });
           transactions = importedTx;
           budgets = importedBudgets;
         } else {
@@ -2223,6 +2245,69 @@
       document.getElementById("importFile").value = "";
     };
     reader.readAsText(file);
+  });
+
+  // ---------- Restauration d'une version anterieure (via un commit GitHub) ----------
+
+  var restoreCandidate = null;
+
+  document.getElementById("btnPreviewRestore").addEventListener("click", function(){
+    var cfg = loadSyncConfig();
+    if(!cfg){ alert("Configure d'abord la synchronisation."); return; }
+    var ref = document.getElementById("sRestoreSha").value.trim();
+    if(!ref){ alert("Colle le SHA du commit à restaurer."); return; }
+
+    var previewBox = document.getElementById("restorePreview");
+    var applyRow = document.getElementById("restoreApplyRow");
+    previewBox.style.display = "block";
+    previewBox.textContent = "Lecture en cours...";
+    applyRow.style.display = "none";
+    restoreCandidate = null;
+
+    githubGetFileAtRef(cfg, ref).then(function(payload){
+      return decryptData(payload, cfg.passphrase);
+    }).then(function(data){
+      var tx = Array.isArray(data) ? data : (data.transactions || []);
+      var bud = Array.isArray(data) ? {} : (data.budgets || {});
+      var s = computeSummary(tx);
+      var dates = tx.map(function(t){ return t.date; }).sort();
+      var range = dates.length ? (dates[0] + " → " + dates[dates.length-1]) : "aucune date";
+
+      restoreCandidate = { tx: tx, budgets: bud };
+
+      previewBox.innerHTML =
+        '<b>' + tx.length + ' transactions</b> trouvées dans ce commit.<br>' +
+        'Période couverte : ' + range + '<br>' +
+        'Total apport (toutes périodes) : ' + fmt(s.revenus) + '<br>' +
+        'Total dépenses (toutes périodes) : ' + fmt(s.depenses) + '<br><br>' +
+        'Vérifie que ces montants te semblent corrects avant de charger cette version.';
+      applyRow.style.display = "flex";
+    }).catch(function(err){
+      previewBox.textContent = "Impossible de lire cette version : " + err.message;
+      applyRow.style.display = "none";
+    });
+  });
+
+  document.getElementById("btnApplyRestore").addEventListener("click", function(){
+    if(!restoreCandidate) return;
+    if(!confirm("Remplacer toutes les données actuelles de cet appareil par cette version ? Cette action est immédiate.")) return;
+
+    restoreCandidate.tx.forEach(function(t){ t.updatedAt = Date.now(); });
+    transactions = restoreCandidate.tx;
+    budgets = restoreCandidate.budgets;
+    tombstones = {};
+
+    saveTransactions(transactions);
+    saveBudgets(budgets);
+    saveTombstones(tombstones);
+
+    document.getElementById("restorePreview").style.display = "none";
+    document.getElementById("restoreApplyRow").style.display = "none";
+    document.getElementById("sRestoreSha").value = "";
+    restoreCandidate = null;
+
+    renderCurrentView();
+    showToast("Version restaurée. Synchronise maintenant pour la propager.");
   });
 
   // ---------- Synchronisation chiffree via GitHub ----------
@@ -2299,6 +2384,20 @@
       return res.json().then(function(json){
         var content = atob(json.content.replace(/\n/g,""));
         return { sha: json.sha, payload: JSON.parse(content) };
+      });
+    });
+  }
+
+  function githubGetFileAtRef(cfg, ref){
+    var url = "https://api.github.com/repos/" + cfg.owner + "/" + cfg.repo + "/contents/" + DATA_PATH + "?ref=" + encodeURIComponent(ref) + "&_=" + Date.now();
+    return fetch(url, {
+      cache: "no-store",
+      headers: { "Authorization":"Bearer " + cfg.token, "Accept":"application/vnd.github+json" }
+    }).then(function(res){
+      if(!res.ok) return res.text().then(function(t){ throw new Error("Lecture impossible pour ce commit (" + res.status + ")"); });
+      return res.json().then(function(json){
+        var content = atob(json.content.replace(/\n/g,""));
+        return JSON.parse(content);
       });
     });
   }
