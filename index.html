@@ -1204,7 +1204,7 @@
     var inMoreMenu = (view === "transactions" || view === "budgets" || view === "rapports" || view === "settings");
     document.getElementById("bottomMore").classList.toggle("active", inMoreMenu);
 
-    var yearBasedView = (view === "dashboard" || view === "budgets" || view === "analyses");
+    var yearBasedView = (view === "dashboard" || view === "budgets" || view === "analyses" || view === "transactions");
     document.getElementById("yearNavRow").style.display = yearBasedView ? "flex" : "none";
     document.getElementById("monthNavRow").style.display = yearBasedView ? "none" : "flex";
 
@@ -1379,16 +1379,23 @@
 
   function payerDisplayName(p){ return p === "Elise" ? "Élise" : p; }
 
+  function formatDateShort(dateStr){
+    var d = new Date(dateStr + "T00:00:00");
+    return d.toLocaleDateString("fr-FR", { day:"numeric", month:"short" }).replace(".", "");
+  }
+
   function txRowHtml(t){
     var catList = t.type === "expense" ? ALL_EXPENSE_CATEGORIES : INCOME_CATEGORIES;
     var color = categoryColor(t.category, catList);
     var sign = t.type === "income" ? "+" : "-";
     var payerTag = t.payer ? '<span class="tx-tag tx-tag-' + t.payer.toLowerCase() + '">' + payerDisplayName(t.payer) + '</span>' : "";
+    var dateLabel = formatDateShort(t.date);
+    var descLabel = t.description ? (t.description + " · " + dateLabel) : dateLabel;
     return '<div class="tx-row" data-id="' + t.id + '">' +
       '<span class="tx-dot" style="background:' + color + '"></span>' +
       '<div class="tx-info">' +
         '<div class="tx-cat">' + t.category + payerTag + '</div>' +
-        '<div class="tx-desc">' + (t.description || t.date) + '</div>' +
+        '<div class="tx-desc">' + descLabel + '</div>' +
       '</div>' +
       '<span class="tx-amount ' + t.type + '">' + sign + fmt(t.amount) + '</span>' +
       '<button class="tx-del" data-id="' + t.id + '" aria-label="Supprimer">&#10005;</button>' +
@@ -1493,13 +1500,14 @@
   document.getElementById("trendPeriod").addEventListener("change", renderTrendChart);
 
   function renderTransactionsView(){
-    var list = filteredTx();
+    var list = transactions.filter(function(t){ return t.date.slice(0,4) === currentYear; })
+      .sort(function(a,b){ return b.date.localeCompare(a.date); });
     if(filterCategory) list = list.filter(function(t){ return t.category === filterCategory; });
     if(filterPayer) list = list.filter(function(t){ return t.payer === filterPayer; });
 
     var container = document.getElementById("txList");
     if(list.length === 0){
-      container.innerHTML = '<p class="empty">Aucune transaction pour ce filtre, ce mois-ci.</p>';
+      container.innerHTML = '<p class="empty">Aucune transaction pour ce filtre, cette année.</p>';
       return;
     }
     container.innerHTML = list.map(txRowHtml).join("");
