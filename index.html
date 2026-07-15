@@ -1496,9 +1496,11 @@
 
   function populateFilterCategory(){
     var select = document.getElementById("filterCategory");
-    var all = ["Toutes catégories"].concat(ALL_EXPENSE_CATEGORIES, INCOME_CATEGORIES);
+    var combined = ALL_EXPENSE_CATEGORIES.concat(INCOME_CATEGORIES);
+    var unique = combined.filter(function(c, idx){ return combined.indexOf(c) === idx; });
+    unique.sort(function(a,b){ return a.localeCompare(b, "fr"); });
     select.innerHTML = '<option value="">Toutes catégories</option>' +
-      ALL_EXPENSE_CATEGORIES.concat(INCOME_CATEGORIES).map(function(c){ return '<option value="' + c + '">' + c + '</option>'; }).join("");
+      unique.map(function(c){ return '<option value="' + c + '">' + c + '</option>'; }).join("");
   }
   populateFilterCategory();
 
