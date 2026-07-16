@@ -695,7 +695,7 @@
             <option value="">Tous les payeurs</option>
             <option value="Nicolas">Nicolas</option>
             <option value="Elise">Élise</option>
-            <option value="Aucun">Aucun</option>
+            <option value="Aucun">Non défini</option>
           </select>
         </div>
         <div id="txList"></div>
@@ -861,7 +861,7 @@
         <div class="type-toggle">
           <button type="button" class="active nicolas" id="togglePayerNicolas" data-payer="Nicolas">Nicolas</button>
           <button type="button" class="elise" id="togglePayerElise" data-payer="Elise">Élise</button>
-          <button type="button" class="aucun" id="togglePayerAucun" data-payer="Aucun">Aucun</button>
+          <button type="button" class="aucun" id="togglePayerAucun" data-payer="Aucun">Non défini</button>
         </div>
       </div>
       <div class="field">
@@ -1398,7 +1398,11 @@
     }
   }
 
-  function payerDisplayName(p){ return p === "Elise" ? "Élise" : p; }
+  function payerDisplayName(p){
+    if(p === "Elise") return "Élise";
+    if(p === "Aucun") return "Non défini";
+    return p;
+  }
 
   function formatDateShort(dateStr){
     var d = new Date(dateStr + "T00:00:00");
